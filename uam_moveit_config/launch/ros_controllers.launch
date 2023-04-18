@@ -2,11 +2,12 @@
 <launch>
 
   <!-- Load joint controller configurations from YAML file to parameter server -->
-  <rosparam file="$(find uam_moveit)/config/ros_controllers.yaml" command="load"/>
+  <rosparam file="$(find uam_moveit_config)/config/ros_controllers.yaml" command="load"/>
   <!-- rosparam file="$(find uam_moveit)/config/pid_gains.yaml" command="load"/ -->
 
   <!-- Load the controllers -->
-  <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
+  <!-- Ignoring because they're loaded beforehand! -->
+  <node ns="red_manipulator" name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
     output="screen" args="joint_state_controller arm_controller "/>
 
 </launch>

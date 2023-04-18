@@ -7,9 +7,9 @@
   <arg name="world_pose" default="-x 0 -y 0 -z 0 -R 0 -P 0 -Y 0" doc="Pose to spawn the robot at"/>
 
   <!-- Start Gazebo paused to allow the controllers to pickup the initial pose -->
-  <include file="$(find gazebo_ros)/launch/empty_world.launch" pass_all_args="true">
+  <!--include file="$(find gazebo_ros)/launch/empty_world.launch" pass_all_args="true">
     <arg name="paused" value="true"/>
-  </include>
+  </include-->
 
   <!-- Set the robot urdf on the parameter server -->
   <param name="robot_description" command="xacro  '$(find ardupilot_gazebo)/models/manipulator/urdf/asap_manipulator_moveit.base.urdf.xacro'" />
@@ -22,7 +22,7 @@
     respawn="false" output="screen" /-->
 
   <!-- Load the controller parameters onto the parameter server -->
-  <include file="$(find uam_moveit)/launch/ros_controllers.launch"/>
+  <include file="$(find uam_moveit_config)/launch/ros_controllers.launch"/>
 
   <!-- Given the published joint states, publish tf for the robot links -->
   <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" respawn="true" output="screen" />

@@ -2,6 +2,7 @@
 <launch>
   <!-- MoveIt options -->
   <arg name="pipeline" default="ompl" doc="Planning pipeline to use with MoveIt"/>
+  <arg name="start_gazebo" default="true"/>
 
   <!-- Gazebo options -->
   <arg name="gazebo_gui" default="true" doc="Start Gazebo GUI"/>
@@ -9,15 +10,17 @@
   <arg name="world_name" default="worlds/empty.world" doc="Gazebo world file"/>
   <arg name="world_pose" default="-x 0 -y 0 -z 0 -R 0 -P 0 -Y 0" doc="Pose to spawn the robot at"/>
 
-  <arg name="rviz_config" value="$(find uam_moveit)/launch/moveit.rviz"/>
+  <arg name="rviz_config" value="$(find uam_moveit_config)/launch/moveit.rviz"/>
 
   <!-- Launch Gazebo and spawn the robot -->
-  <include file="$(dirname)/gazebo.launch" pass_all_args="true"/>
+  <group if="$(arg start_gazebo)">
+    <include file="$(dirname)/gazebo.launch" pass_all_args="true"/>
+  </group>
 
   <!-- Launch MoveIt -->
   <include file="$(dirname)/demo.launch" pass_all_args="true">
     <!-- robot_description is loaded by gazebo.launch, to enable Gazebo features -->
-    <arg name="load_robot_description" value="false" />
+    <arg name="load_robot_description" value="true" />
     <arg name="moveit_controller_manager" value="ros_control" />
   </include>
 </launch>
