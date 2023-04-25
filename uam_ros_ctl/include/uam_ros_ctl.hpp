@@ -33,7 +33,7 @@ class UamRosCtl
         ros::NodeHandle nodeHandle_; 
         ros::NodeHandle nodeHandleWithoutNs_; 
         
-        moveit::planning_interface::MoveGroupInterfaceConstPtr m_moveGroupPtr;
+        moveit::planning_interface::MoveGroupInterface  *m_moveGroupPtr;
         robot_state::JointModelGroupConstPtr                   m_jointModelGroupPtr; 
         planning_scene::PlanningSceneConstPtr                  m_planningScenePtr; 
         moveit::core::RobotStatePtr                            m_currentRobotStatePtr; 
@@ -49,6 +49,9 @@ class UamRosCtl
 
         bool initPublishers();
         bool initSubscribers();
+        bool setMoveGroup();
+
+        void targetPoseCallback(const geometry_msgs::Pose::ConstPtr& msg);
 
 }; 
 
