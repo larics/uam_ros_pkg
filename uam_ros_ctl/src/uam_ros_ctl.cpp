@@ -30,6 +30,7 @@ void UamRosCtl::run() {
     ros::Rate loop_rate(10);
     while (ros::ok())
     {
+        //ROS_INFO_NAMED("uam_ros_ctl", "running...");
         ros::spinOnce();
         loop_rate.sleep();
     }
