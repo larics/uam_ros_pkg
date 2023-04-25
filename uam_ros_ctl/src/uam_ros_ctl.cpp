@@ -18,7 +18,7 @@ bool UamRosCtl::initPublishers()
     return true;
 }
 
-bool uamRosCtl::initSubscribers()
+bool UamRosCtl::initSubscribers()
 {
     ROS_INFO_NAMED("uam_ros_ctl", "Initializing Subscribers!");
     // TODO: Initialize subscribers

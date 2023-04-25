@@ -1,0 +1,3 @@
+<launch>
+    <node pkg="uam_ros_ctl"
+</launch>

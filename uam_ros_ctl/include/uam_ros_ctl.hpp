@@ -22,14 +22,16 @@
 class UamRosCtl
 {
     public: 
-        UamRosCtl(ros::NodeHandle& nh);
+        UamRosCtl(ros::NodeHandle nh);
         ~UamRosCtl();
+
+        void run(); 
 
     private: 
         
         // ROS node handle
-        ros::NodeHandle nH_; 
-        ros::NodeHandle nHWithoutNs_; 
+        ros::NodeHandle nodeHandle_; 
+        ros::NodeHandle nodeHandleWithoutNs_; 
         
         moveit::planning_interface::MoveGroupInterfaceConstPtr m_moveGroupPtr;
         robot_state::JointModelGroupConstPtr                   m_jointModelGroupPtr; 
