@@ -6,6 +6,7 @@
   <arg name="world_name" default="worlds/empty.world" doc="Gazebo world file"/>
   <arg name="world_pose" default="-x 0 -y 0 -z 0 -R 0 -P 1 -Y 0" doc="Pose to spawn the robot at"/>
   <arg name="start_gazebo" default="true"/>
+  <arg name="real_robot" default="false"/>
 
 
   <!-- Set the robot urdf on the parameter server -->
@@ -28,7 +29,9 @@
   </group>
 
   <!-- Load the controller parameters onto the parameter server -->
-  <include file="$(find uam_moveit_config)/launch/ros_controllers.launch"/>
+  <include file="$(find uam_moveit_config)/launch/ros_controllers.launch">
+    <arg name="real_robot" value="$(arg real_robot)"/>
+  </include>
 
   <!-- Given the published joint states, publish tf for the robot links -->
   <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" respawn="true" output="screen" />
