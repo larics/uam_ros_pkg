@@ -80,7 +80,6 @@
     <arg name="moveit_sensor_manager" value="manipulator" />
   </include>
 
-
   <!-- Start the actual move_group node/action server -->
   <node name="move_group" launch-prefix="$(arg launch_prefix)" pkg="moveit_ros_move_group" type="move_group" respawn="false" output="screen" args="$(arg command_args)">
 

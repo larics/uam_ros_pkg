@@ -4,12 +4,9 @@
   <arg name="gazebo_gui" default="true" doc="Start Gazebo GUI"/>
   <arg name="paused" default="true" doc="Start Gazebo paused"/>
   <arg name="world_name" default="worlds/empty.world" doc="Gazebo world file"/>
-  <arg name="world_pose" default="-x 0 -y 0 -z 0 -R 0 -P 0 -Y 0" doc="Pose to spawn the robot at"/>
+  <arg name="world_pose" default="-x 0 -y 0 -z 0 -R 0 -P 1 -Y 0" doc="Pose to spawn the robot at"/>
+  <arg name="start_gazebo" default="true"/>
 
-  <!-- Start Gazebo paused to allow the controllers to pickup the initial pose -->
-  <!--include file="$(find gazebo_ros)/launch/empty_world.launch" pass_all_args="true">
-    <arg name="paused" value="true"/>
-  </include-->
 
   <!-- Set the robot urdf on the parameter server -->
   <param name="robot_description" command="xacro  '$(find ardupilot_gazebo)/models/manipulator/urdf/asap_manipulator_moveit.base.urdf.xacro'" />
@@ -17,9 +14,18 @@
   <!-- Unpause the simulation after loading the robot model -->
   <arg name="unpause" value="$(eval '' if arg('paused') else '-unpause')" />
 
+  <group if="$(arg start_gazebo)">
+  
+  <!-- Start Gazebo paused to allow the controllers to pickup the initial pose -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch" pass_all_args="true">
+    <arg name="paused" value="true"/>
+  </include>
+
   <!-- Spawn the robot in Gazebo -->
-  <!--node name="spawn_gazebo_model" pkg="gazebo_ros" type="spawn_model" args="-urdf -param robot_description -model robot $(arg unpause) $(arg world_pose) "
-    respawn="false" output="screen" /-->
+  <node name="spawn_gazebo_model" pkg="gazebo_ros" type="spawn_model" args="-urdf -param robot_description -model robot $(arg unpause) $(arg world_pose) "
+    respawn="false" output="screen" />
+  
+  </group>
 
   <!-- Load the controller parameters onto the parameter server -->
   <include file="$(find uam_moveit_config)/launch/ros_controllers.launch"/>
