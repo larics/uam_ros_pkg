@@ -6,6 +6,9 @@ Currently configured for the `ASAP` manipulator which has quite simple configura
 
 ## TODO: 
 
-- [ ] Enable simple control of the manipulator 
-- [ ] Write control node for the manipulator in the ROS pkg `uam_ctl`
-- [ ] Test on real UAM
+- [x] Enable simple control of the real manipulator (remapping moveit trajectory) 
+- [x] Write simple control node for the manipulator in the ROS pkg `uam_ctl`ž
+- [ ] Enable joint commands
+- [ ] Publish end effector position on the topic 
+- [ ] Add functionality fodr simple trajectory execution
+- [ ] Test on real UAM (real manipulator) 
