@@ -22,7 +22,7 @@ roslaunch uam_moveit_config demo_gazebo.launch real_robot:="true" gazebo:="false
 
 - [x] Enable simple control of the real manipulator (remapping moveit trajectory) 
 - [x] Write simple control node for the manipulator in the ROS pkg `uam_ctl`ž
-- [ ] Add joint limits 
+- [x] Add joint limits 
 - [ ] Enable joint commands
 - [ ] Publish end effector position on the topic 
 - [ ] Add functionality for simple trajectory execution
