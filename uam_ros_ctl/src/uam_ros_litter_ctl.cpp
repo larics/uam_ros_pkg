@@ -18,7 +18,7 @@ bool UamRosLitterCtl::initPublishers()
 {
     ROS_INFO_NAMED("uam_ros_litter_ctl", "Initializing Publishers!");
     // TODO: Initialize publishers
-    m_pubTrajectoryCmd = nodeHandle_.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("current_pose", 1);
+    m_pubTrajectoryCmd = nodeHandleWithoutNs_.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("red/tracker/input_trajectory", 100);
     return true;
 }
 
@@ -36,17 +36,18 @@ void UamRosLitterCtl::targetPoseCallback(const geometry_msgs::Pose::ConstPtr& ms
     trashLocalized = true;
 }
 
-trajectory_msgs::MultiDOFJointTrajectory UamRosLitterCtl::planQuadraticBezierCurve(const geometry_msgs::Point start_point, 
-                                                                                   const geometry_msgs::Point end_point, 
+trajectory_msgs::MultiDOFJointTrajectory UamRosLitterCtl::planQuadraticBezierCurve(const geometry_msgs::Point start_point,
                                                                                    const geometry_msgs::Point control_point, 
+                                                                                   const geometry_msgs::Point end_point,  
                                                                                    const double time_step)
 {
     trajectory_msgs::MultiDOFJointTrajectory trajectory;
+    double scale_factor = 10.0; 
 
     //TODO: Add planning of a Bezier Curve
     Eigen::Vector3d p0(start_point.x, start_point.y, start_point.z);
-    Eigen::Vector3d p1(end_point.x, end_point.y, end_point.z);
-    Eigen::Vector3d p2(control_point.x, control_point.y, control_point.z);
+    Eigen::Vector3d p1(control_point.x, control_point.y, control_point.z);
+    Eigen::Vector3d p2(end_point.x, end_point.y, end_point.z);
 
     // Set initial parametrized time
     Eigen::VectorXd t; 
@@ -58,9 +59,27 @@ trajectory_msgs::MultiDOFJointTrajectory UamRosLitterCtl::planQuadraticBezierCur
     Eigen::VectorXd ones = Eigen::VectorXd::Ones( t.rows( ) );
 
     // Compute Bezier Curve
-    Eigen::MatrixXd BezierQuad = ((ones.array()-t.array()).pow(2)).matrix()*p0.transpose();
+    // TODO: Check how to make this nicer
+    Eigen::MatrixXd BezierQuad = ((ones.array()-t.array()).pow(2)).matrix()*p0.transpose() \
+                                  + 2*(ones.array()-t.array()).matrix()*t.array().matrix()*p1.transpose() \
+                                    + (t.array().pow(2)).matrix()*p2.transpose();
 
-    std::cout << "BezierQuad: " << BezierQuad << std::endl;
+    for (int i = 0; i < t.rows(); i++) {
+        trajectory_msgs::MultiDOFJointTrajectoryPoint point;
+        point.transforms.resize(1);
+        point.transforms[0].translation.x = BezierQuad(i, 0);
+        point.transforms[0].translation.y = BezierQuad(i, 1);
+        point.transforms[0].translation.z = BezierQuad(i, 2);
+        point.transforms[0].rotation.x = 0;
+        point.transforms[0].rotation.y = 0;
+        point.transforms[0].rotation.z = 0;
+        point.transforms[0].rotation.w = 1;
+        point.time_from_start = ros::Duration(i*time_step*scale_factor);
+        trajectory.points.push_back(point);
+    }
+
+    //std::cout << "BezierQuad: " << BezierQuad << std::endl;
+    //std::cout << "PlannedTrajectory" << trajectory << std::endl;
 
     ROS_INFO_NAMED("uam_ros_litter_ctl", "Planning quadratic bezier curve!");
 
@@ -74,9 +93,28 @@ void UamRosLitterCtl::run() {
     while (ros::ok())
     {
 
+        // TODO: Think of a state machine control (Maybe there's even something implemented)
         if (trashLocalized) {
-
             
+            // TODO: For uav grab current pose 
+            // TODO: For cp grab pose without height
+            // TODO: For final pose grab pose of an localized object
+            //pts_ = {"uav": (9, 8, 3), 
+            //"cp": (9, 8, 1), 
+            //"goal": (3, 8, 1)}
+
+            trajectory_msgs::MultiDOFJointTrajectory trajectoryCmd; 
+
+            geometry_msgs::Point start_point, control_point, goal_point;
+            start_point.x = 9; start_point.y = 8; start_point.z = 3;
+            control_point.x = 9; control_point.y = 8; control_point.z = 1;
+            goal_point.x = 3; goal_point.y = 8; goal_point.z = 1;
+
+            ROS_INFO_NAMED("uam_ros_litter_ctl", "Publishing trajectory command!");
+            trajectoryCmd = planQuadraticBezierCurve(start_point, control_point, goal_point, 0.01);   
+            std::cout << "TrajectoryCmd: " << trajectoryCmd << std::endl;    
+            m_pubTrajectoryCmd.publish(trajectoryCmd); 
+            trashLocalized = false;    
         
         }
         //ROS_INFO_NAMED("uam_ros_ctl", "running...");
