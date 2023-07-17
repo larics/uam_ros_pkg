@@ -6,7 +6,8 @@ UamRosCtl::UamRosCtl(ros::NodeHandle nh): nodeHandle_(nh)
     
     initPublishers(); 
     initSubscribers(); 
-    setMoveGroup(); 
+    moveGroupInitialized = setMoveGroup(); 
+    //setPlanningScene();
 }
 
 

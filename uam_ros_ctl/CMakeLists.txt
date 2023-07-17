@@ -14,6 +14,7 @@ find_package(catkin REQUIRED
     moveit_ros_planning_interface
     moveit_ros_move_group
     moveit_msgs
+    trajectory_msgs
     roscpp
     std_msgs
     tf
@@ -33,6 +34,7 @@ catkin_package(
         moveit_ros_planning_interface
         moveit_ros_move_group
         moveit_msgs
+        trajectory_msgs
         roscpp 
         std_msgs
         tf
@@ -50,6 +52,7 @@ include_directories(
 #########
 set(PROJECT_LIB_FILES
     src/uam_ros_ctl.cpp
+    src/uam_ros_litter_ctl.cpp
 )
 
 ## Declare a C++ library
@@ -69,4 +72,17 @@ target_link_libraries(
         ${EIGEN3_LIBRARIES}
         ${catkin_LIBRARIES}
 )
+
+add_executable(
+    uam_ros_litter_ctl_node
+    src/uam_ros_litter_ctl_node.cpp
+)
+
+target_link_libraries(
+    uam_ros_litter_ctl_node
+    uam_ros_ctl_lib
+    ${EIGEN3_LIBRARIES}
+    ${catkin_LIBRARIES}
+)
+
 

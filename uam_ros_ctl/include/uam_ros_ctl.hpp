@@ -53,6 +53,9 @@ class UamRosCtl
 
         void targetPoseCallback(const geometry_msgs::Pose::ConstPtr& msg);
 
+        bool moveGroupInitialized = false; 
+        bool planningSceneInitialized = false;
+
 }; 
 
 

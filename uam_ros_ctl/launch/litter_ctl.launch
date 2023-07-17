@@ -1,0 +1,3 @@
+<launch>
+    <node pkg="uam_ros_ctl" type="uam_ros_litter_ctl_node" name="uam_ros_litter_ctl" output="screen"/>
+</launch>
