@@ -41,8 +41,9 @@ trajectory_msgs::MultiDOFJointTrajectory UamRosLitterCtl::planQuadraticBezierCur
                                                                                    const geometry_msgs::Point end_point,  
                                                                                    const double time_step)
 {
-    trajectory_msgs::MultiDOFJointTrajectory trajectory;
-    double scale_factor = 3.0; 
+    trajectory_msgs::MultiDOFJointTrajectory trajectory; 
+    //Eigen::MatrixXd BezierQuad;
+    double scale_factor = 5.0; 
 
     //TODO: Add planning of a Bezier Curve
     Eigen::Vector3d p0(start_point.x, start_point.y, start_point.z);
@@ -50,22 +51,20 @@ trajectory_msgs::MultiDOFJointTrajectory UamRosLitterCtl::planQuadraticBezierCur
     Eigen::Vector3d p2(end_point.x, end_point.y, end_point.z);
 
     // Set initial parametrized time
-    Eigen::VectorXd t; 
-    t.setLinSpaced(1/time_step, 0, 1);
-
-    //# Bezier quadratic curve
-    //Bquad = ((1-t)**2)*p0 + 2*(1-t)*t*p1 + t**2*p2
-
+    Eigen::VectorXd t;
+    int N = static_cast<int>(1/time_step+1); 
+    t.setLinSpaced(N, 0, 1);
     Eigen::VectorXd ones = Eigen::VectorXd::Ones( t.rows( ) );
 
     // Compute Bezier Curve
     // TODO: Check how to make this nicer
-    Eigen::MatrixXd BezierQuad = ((ones.array()-t.array()).pow(2)).matrix()*p0.transpose() \
-                                  + 2*(ones.array()-t.array()).matrix()*t.array().matrix()*p1.transpose() \
-                                    + (t.array().pow(2)).matrix()*p2.transpose();
-
-    std::cout << "p0" << p0 << std::endl; 
-    std::cout << "p0.T" << p0.transpose() << std::endl;
+    // https://medium.com/geekculture/2d-and-3d-b%C3%A9zier-curves-in-c-499093ef45a9
+    // https://blog.demofox.org/2016/03/05/matrix-form-of-bezier-curves/
+    //Bquad = ((1-t)**2)*p0 + 2*(1-t)*t*p1 + t**2*p2
+    Eigen::VectorXd t1 = (ones-t).array().pow(2);
+    Eigen::VectorXd t2 = (ones-t).matrix().asDiagonal()*t; 
+    Eigen::VectorXd t3 = t.array().pow(2); 
+    Eigen::MatrixXd BezierQuad = t1*p0.transpose() + 2*t2*p1.transpose() + t3*p2.transpose();
 
     for (int i = 0; i < t.rows(); i++) {
         trajectory_msgs::MultiDOFJointTrajectoryPoint point;
@@ -80,10 +79,6 @@ trajectory_msgs::MultiDOFJointTrajectory UamRosLitterCtl::planQuadraticBezierCur
         point.time_from_start = ros::Duration(i*time_step*scale_factor);
         trajectory.points.push_back(point);
     }
-
-    //std::cout << "BezierQuad: " << BezierQuad << std::endl;
-    //std::cout << "PlannedTrajectory" << trajectory << std::endl;
-
     ROS_INFO_NAMED("uam_ros_litter_ctl", "Planning quadratic bezier curve!");
 
     return trajectory; 
@@ -99,7 +94,7 @@ void UamRosLitterCtl::run() {
         // TODO: Think of a state machine control (Maybe there's even something implemented)
         if (trashLocalized) {
             
-            // TODO: For uav grab current pose 
+            // TODO: For uav grab current pose 0
             // TODO: For cp grab pose without height
             // TODO: For final pose grab pose of an localized object
             //pts_ = {"uav": (9, 8, 3), 
@@ -109,13 +104,13 @@ void UamRosLitterCtl::run() {
             trajectory_msgs::MultiDOFJointTrajectory trajectoryCmd; 
 
             geometry_msgs::Point start_point, control_point, goal_point;
-            start_point.x = 6; start_point.y = 4; start_point.z = 5;
-            control_point.x = 6; control_point.y = 4; control_point.z = -1;
+            start_point.x = 9; start_point.y = 4; start_point.z = 5;
+            control_point.x = 9; control_point.y = 4; control_point.z = -1;
             goal_point.x = 1; goal_point.y = 4; goal_point.z = 2;
 
             ROS_INFO_NAMED("uam_ros_litter_ctl", "Publishing trajectory command!");
-            trajectoryCmd = planQuadraticBezierCurve(start_point, control_point, goal_point, 0.01);   
-            //std::cout << "TrajectoryCmd: " << trajectoryCmd << std::endl;    
+            trajectoryCmd = planQuadraticBezierCurve(start_point, control_point, goal_point, 0.25);   
+            std::cout << "TrajectoryCmd: " << trajectoryCmd << std::endl;    
             m_pubTrajectoryCmd.publish(trajectoryCmd); 
             trashLocalized = false;    
         
