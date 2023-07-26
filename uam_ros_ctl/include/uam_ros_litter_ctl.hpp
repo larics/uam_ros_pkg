@@ -37,7 +37,7 @@ class UamRosLitterCtl
 
     private: 
         
-        // ROS node handle
+        // ROS node handles
         ros::NodeHandle nodeHandle_; 
         ros::NodeHandle nodeHandleWithoutNs_;  
 
@@ -49,11 +49,15 @@ class UamRosLitterCtl
         ros::Subscriber m_subTargetPose;
         ros::Subscriber m_subCurrentPose; 
 
+        // init methods
         bool initPublishers();
         bool initSubscribers();
 
+        // callbacks 
         void targetPoseCb(const geometry_msgs::Pose::ConstPtr& msg);
-        void currentPoseCb(const nav_msgs::Odometry::ConstPtr& msg); 
+        void currentPoseCb(const nav_msgs::Odometry::ConstPtr& msg);
+
+        // plan curves methods 
         trajectory_msgs::MultiDOFJointTrajectory planQuadraticBezierCurve(const geometry_msgs::Point start_point, 
                                                                            const geometry_msgs::Point end_point, 
                                                                            const geometry_msgs::Point control_point, 
@@ -65,7 +69,6 @@ class UamRosLitterCtl
         bool trashLocalized = false;
         bool poseReciv = false;
         bool pickUpComplete = false; 
-
         int start_time; 
 
         // UAV pose

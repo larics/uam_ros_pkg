@@ -104,6 +104,7 @@ void UamRosLitterCtl::run() {
     while (ros::ok())
     {
 
+        // TODO: REFACTOR THIS!
         // TODO: Think of a state machine control (Maybe there's even something implemented)
         if (trashLocalized && poseReciv) {
             
