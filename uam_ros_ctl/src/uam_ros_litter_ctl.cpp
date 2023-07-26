@@ -19,22 +19,35 @@ bool UamRosLitterCtl::initPublishers()
     ROS_INFO_NAMED("uam_ros_litter_ctl", "Initializing Publishers!");
     // TODO: Initialize publishers
     m_pubTrajectoryCmd = nodeHandleWithoutNs_.advertise<trajectory_msgs::MultiDOFJointTrajectory>("red/tracker/input_trajectory", 100);
+    m_pubPoseCmd = nodeHandleWithoutNs_.advertise<geometry_msgs::PoseStamped>("red/tracker/input_pose", 100);
     return true;
 }
 
 bool UamRosLitterCtl::initSubscribers()
 {
     ROS_INFO_NAMED("uam_ros_litter_ctl", "Initializing Subscribers!");
-    m_subTargetPose = nodeHandle_.subscribe("target_pose", 1, &UamRosLitterCtl::targetPoseCallback, this);
+    m_subTargetPose = nodeHandle_.subscribe("target_pose", 1, &UamRosLitterCtl::targetPoseCb, this);
+    m_subCurrentPose = nodeHandleWithoutNs_.subscribe("/red/mavros/local_position/odom", 1, &UamRosLitterCtl::currentPoseCb, this);
     // TODO: Initialize subscribers
     return true;
 }
 
-void UamRosLitterCtl::targetPoseCallback(const geometry_msgs::Pose::ConstPtr& msg)
+void UamRosLitterCtl::targetPoseCb(const geometry_msgs::Pose::ConstPtr& msg)
 {
     ROS_INFO_NAMED("uam_ros_litter_ctl", "Target pose callback!");
     trashLocalized = true;
 }
+
+void UamRosLitterCtl::currentPoseCb(const nav_msgs::Odometry::ConstPtr& msg)
+{
+    poseReciv = true; 
+    currentPose.header = msg->header;
+    currentPose.pose = msg->pose.pose;
+    currentVel.linear = msg->twist.twist.linear;
+    currentVel.angular = msg->twist.twist.angular;
+
+}
+
 
 trajectory_msgs::MultiDOFJointTrajectory UamRosLitterCtl::planQuadraticBezierCurve(const geometry_msgs::Point start_point,
                                                                                    const geometry_msgs::Point control_point, 
@@ -43,7 +56,7 @@ trajectory_msgs::MultiDOFJointTrajectory UamRosLitterCtl::planQuadraticBezierCur
 {
     trajectory_msgs::MultiDOFJointTrajectory trajectory; 
     //Eigen::MatrixXd BezierQuad;
-    double scale_factor = 5.0; 
+    double scale_factor = 2.0; 
 
     //TODO: Add planning of a Bezier Curve
     Eigen::Vector3d p0(start_point.x, start_point.y, start_point.z);
@@ -92,7 +105,7 @@ void UamRosLitterCtl::run() {
     {
 
         // TODO: Think of a state machine control (Maybe there's even something implemented)
-        if (trashLocalized) {
+        if (trashLocalized && poseReciv) {
             
             // TODO: For uav grab current pose 0
             // TODO: For cp grab pose without height
@@ -104,16 +117,48 @@ void UamRosLitterCtl::run() {
             trajectory_msgs::MultiDOFJointTrajectory trajectoryCmd; 
 
             geometry_msgs::Point start_point, control_point, goal_point;
-            start_point.x = 9; start_point.y = 4; start_point.z = 5;
-            control_point.x = 9; control_point.y = 4; control_point.z = -1;
-            goal_point.x = 1; goal_point.y = 4; goal_point.z = 2;
+            start_point.x = currentPose.pose.position.x;
+            start_point.y = currentPose.pose.position.y;
+            start_point.z = currentPose.pose.position.z;
+            control_point.x = currentPose.pose.position.x;
+            control_point.y = currentPose.pose.position.y;
+            control_point.z = 0;
+            goal_point.x = targetPose.pose.position.x;
+            goal_point.y = targetPose.pose.position.y;
+            goal_point.z = 1;
 
             ROS_INFO_NAMED("uam_ros_litter_ctl", "Publishing trajectory command!");
-            trajectoryCmd = planQuadraticBezierCurve(start_point, control_point, goal_point, 0.25);   
-            std::cout << "TrajectoryCmd: " << trajectoryCmd << std::endl;    
-            m_pubTrajectoryCmd.publish(trajectoryCmd); 
-            trashLocalized = false;    
-        
+            trajectoryCmd = planQuadraticBezierCurve(start_point, control_point, goal_point, 0.05);       
+            m_pubTrajectoryCmd.publish(trajectoryCmd);  
+            start_time = ros::Time::now().toSec();
+            trashLocalized = false;
+        }
+
+        int timeout = 3.0; 
+        int elapsed = ros::Time::now().toSec() - start_time;
+        if (!pickUpComplete && elapsed > timeout){
+            if (std::abs(currentVel.linear.x) < 0.05 && std::abs(currentVel.linear.y) < 0.05 && std::abs(currentVel.linear.z)< 0.05)
+            {
+                ROS_INFO_NAMED("uam_ros_litter_ctl", "Pickup complete!"); 
+                pickUpComplete = true;
+            }
+            else
+            {
+                ROS_INFO("Current velocity: [%f, %f, %f]", currentVel.linear.x, currentVel.linear.y, currentVel.linear.z);
+            }
+        }
+
+        if (pickUpComplete){
+
+            ROS_INFO_NAMED("uam_ros_litter", "Pickup complete!"); 
+            geometry_msgs::PoseStamped poseCmd; float heightAdd = 5.0; 
+            poseCmd.pose.position.x = currentPose.pose.position.x;
+            poseCmd.pose.position.y = currentPose.pose.position.y; 
+            poseCmd.pose.position.z = currentPose.pose.position.z + heightAdd;
+            poseCmd.pose.orientation = currentPose.pose.orientation;  
+            m_pubPoseCmd.publish(poseCmd); 
+            pickUpComplete = false;
+            trashLocalized = false; 
         }
         //ROS_INFO_NAMED("uam_ros_ctl", "running...");
         ros::spinOnce();

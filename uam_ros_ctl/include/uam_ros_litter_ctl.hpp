@@ -9,6 +9,8 @@
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/Point.h>
 #include <geometry_msgs/TransformStamped.h>
+#include <geometry_msgs/Twist.h>
+#include <nav_msgs/Odometry.h>
 #include <trajectory_msgs/MultiDOFJointTrajectory.h>
 #include <trajectory_msgs/MultiDOFJointTrajectoryPoint.h>
 
@@ -41,20 +43,35 @@ class UamRosLitterCtl
 
         // ROS Publishers 
         ros::Publisher m_pubTrajectoryCmd;
+        ros::Publisher m_pubPoseCmd;
 
         // ROS Subscribers 
         ros::Subscriber m_subTargetPose;
+        ros::Subscriber m_subCurrentPose; 
 
         bool initPublishers();
         bool initSubscribers();
 
-        void targetPoseCallback(const geometry_msgs::Pose::ConstPtr& msg);
+        void targetPoseCb(const geometry_msgs::Pose::ConstPtr& msg);
+        void currentPoseCb(const nav_msgs::Odometry::ConstPtr& msg); 
         trajectory_msgs::MultiDOFJointTrajectory planQuadraticBezierCurve(const geometry_msgs::Point start_point, 
                                                                            const geometry_msgs::Point end_point, 
                                                                            const geometry_msgs::Point control_point, 
                                                                            const double time_step);
+        trajectory_msgs::MultiDOFJointTrajectory planLinearBezierCurve(const geometry_msgs::Point end_point, 
+                                                                       const double time_step); 
 
+        // CTL flags
         bool trashLocalized = false;
+        bool poseReciv = false;
+        bool pickUpComplete = false; 
+
+        int start_time; 
+
+        // UAV pose
+        geometry_msgs::PoseStamped currentPose;
+        geometry_msgs::PoseStamped targetPose; 
+        geometry_msgs::Twist currentVel; 
 
 }; 
 
