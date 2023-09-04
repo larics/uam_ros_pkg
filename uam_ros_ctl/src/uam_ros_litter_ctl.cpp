@@ -4,8 +4,12 @@ UamRosLitterCtl::UamRosLitterCtl(ros::NodeHandle nh): nodeHandle_(nh)
 {
     ROS_INFO_NAMED("uam_ros_litter_ctl", "Initializing!");
     
-    initPublishers(); 
-    initSubscribers(); 
+    initPub = initPublishers(); 
+    initSub = initSubscribers(); 
+
+    ros::Duration(5.0).sleep();
+    if (initPub && initSub){uavState = INIT;}
+    ROS_INFO_NAMED("uam_ros_litter_ctl", "Initialized!");
 }
 
 
@@ -28,6 +32,7 @@ bool UamRosLitterCtl::initSubscribers()
     ROS_INFO_NAMED("uam_ros_litter_ctl", "Initializing Subscribers!");
     m_subTargetPose = nodeHandle_.subscribe("target_pose", 1, &UamRosLitterCtl::targetPoseCb, this);
     m_subCurrentPose = nodeHandleWithoutNs_.subscribe("/red/mavros/local_position/odom", 1, &UamRosLitterCtl::currentPoseCb, this);
+    m_subTracker = nodeHandleWithoutNs_.subscribe("/red/tracker/input_trajectory", 1, &UamRosLitterCtl::trackerCb, this);
     // TODO: Initialize subscribers
     return true;
 }
@@ -46,6 +51,16 @@ void UamRosLitterCtl::currentPoseCb(const nav_msgs::Odometry::ConstPtr& msg)
     currentVel.linear = msg->twist.twist.linear;
     currentVel.angular = msg->twist.twist.angular;
 
+}
+
+void UamRosLitterCtl::trackerCb(const trajectory_msgs::MultiDOFJointTrajectory trajectory){
+    ROS_INFO_NAMED("uam_ros_litter_ctl", "Tracker callback!"); 
+    if (trajectory.points.size() > 0 && firstTrajSent) {
+        trajReciv = true;
+    }
+    else {
+        trajReciv = false;
+    }
 }
 
 
@@ -97,16 +112,72 @@ trajectory_msgs::MultiDOFJointTrajectory UamRosLitterCtl::planQuadraticBezierCur
     return trajectory; 
 }
 
+trajectory_msgs::MultiDOFJointTrajectory UamRosLitterCtl::planLawnmowerTrajectory( const float length,
+                                                                                   const float width,   
+                                                                                   const double step_size)
+{
+    //TODO: Add parametrizable planning of the lawnmower trajectory 
+    trajectory_msgs::MultiDOFJointTrajectory trajectory; 
+    int area = static_cast<int>(length*width);
+    int width_ = static_cast<int>(width);
+    int N = static_cast<int>(area/step_size);
+    double wStep = area/length;
+    wStep = width_/wStep;
+
+    lastX = currentPose.pose.position.x; lastY = currentPose.pose.position.y;
+
+    // TODO: Generalize!
+    for (int i = 0; i < N; i++){
+
+        trajectory_msgs::MultiDOFJointTrajectoryPoint point;
+        point.transforms.resize(1);
+        double lawnStep = i * step_size; 
+        point.transforms[0].translation.x += lastX + lawnmowerDir * step_size;
+        point.transforms[0].translation.y = lastY;
+
+        if (std::fmod(lawnStep, width_) == 0.0 && i != 0){ 
+            point.transforms[0].translation.y += wStep;
+            lawnmowerDir *= -1; 
+        }
+        point.transforms[0].translation.z = currentPose.pose.position.z;
+        point.transforms[0].rotation.x = 0;
+        point.transforms[0].rotation.y = 0;
+        point.transforms[0].rotation.z = 0;
+
+        // TODO: Determine orientation
+        point.transforms[0].rotation.w = 1;
+        point.time_from_start = ros::Duration(i*step_size);
+        trajectory.points.push_back(point);
+        // lastX, lastY
+        lastX = point.transforms[0].translation.x;
+        lastY = point.transforms[0].translation.y;  
+    }
+
+    return trajectory; 
+
+}
+
 
 void UamRosLitterCtl::run() {
     ROS_INFO_NAMED("uam_ros_litter_ctl", "Running!");
     ros::Rate loop_rate(10);
     while (ros::ok())
-    {
+    {   
+        
+        ROS_INFO_THROTTLE_NAMED(1, "uam_ros_litter_ctl", "Running!");
+        ROS_INFO_THROTTLE_NAMED(1, "uam_ros_litter_ctl", "Current state: %d", uavState);
+        trajectory_msgs::MultiDOFJointTrajectory trajectoryCmd; 
+        if (!trashLocalized && uavState == INIT){
+            //TODO: Add search state 
+            trajectoryCmd = planLawnmowerTrajectory(10, 10, 0.5);
+            ROS_INFO_STREAM("Publishing trajectory command!");
+            m_pubTrajectoryCmd.publish(trajectoryCmd);
+            if (trajReciv = true) uavState = SEARCH;
+        }
 
         // TODO: REFACTOR THIS!
-        // TODO: Think of a state machine control (Maybe there's even something implemented)
-        if (trashLocalized && poseReciv) {
+        // TODO: Think of a state machine control (Maybe there's even something implemented))
+        if (trashLocalized && poseReciv && uavState == SEARCH) {
             
             // TODO: For uav grab current pose 0
             // TODO: For cp grab pose without height
@@ -115,7 +186,6 @@ void UamRosLitterCtl::run() {
             //"cp": (9, 8, 1), 
             //"goal": (3, 8, 1)}
 
-            trajectory_msgs::MultiDOFJointTrajectory trajectoryCmd; 
 
             geometry_msgs::Point start_point, control_point, goal_point;
             start_point.x = currentPose.pose.position.x;
@@ -137,6 +207,7 @@ void UamRosLitterCtl::run() {
 
         int timeout = 3.0; 
         int elapsed = ros::Time::now().toSec() - start_time;
+        /*
         if (!pickUpComplete && elapsed > timeout){
             if (std::abs(currentVel.linear.x) < 0.05 && std::abs(currentVel.linear.y) < 0.05 && std::abs(currentVel.linear.z)< 0.05)
             {
@@ -162,6 +233,7 @@ void UamRosLitterCtl::run() {
             trashLocalized = false; 
         }
         //ROS_INFO_NAMED("uam_ros_ctl", "running...");
+        */
         ros::spinOnce();
         loop_rate.sleep();
     }

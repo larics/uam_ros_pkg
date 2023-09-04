@@ -22,8 +22,18 @@
 #include <Eigen/Dense>
 
 
-
-
+// TODO: Think of the switches based on the current state
+enum State
+{
+    //TODO: Maybe correlate with the mavros states
+    NOT_INIT = 0,
+    INIT=1,
+    TAKEOFF=2,
+    SEARCH=3,
+    PICKUP=4,
+    DROPOFF=5,
+    LAND=6
+};
 
 
 
@@ -48,6 +58,7 @@ class UamRosLitterCtl
         // ROS Subscribers 
         ros::Subscriber m_subTargetPose;
         ros::Subscriber m_subCurrentPose; 
+        ros::Subscriber m_subTracker;
 
         // init methods
         bool initPublishers();
@@ -56,25 +67,44 @@ class UamRosLitterCtl
         // callbacks 
         void targetPoseCb(const geometry_msgs::Pose::ConstPtr& msg);
         void currentPoseCb(const nav_msgs::Odometry::ConstPtr& msg);
+        void trackerCb(const trajectory_msgs::MultiDOFJointTrajectory trajectory);
 
         // plan curves methods 
         trajectory_msgs::MultiDOFJointTrajectory planQuadraticBezierCurve(const geometry_msgs::Point start_point, 
                                                                            const geometry_msgs::Point end_point, 
                                                                            const geometry_msgs::Point control_point, 
                                                                            const double time_step);
+
+        trajectory_msgs::MultiDOFJointTrajectory planLawnmowerTrajectory(const float length,
+                                                                         const float width,   
+                                                                         const double step_size);
+
         trajectory_msgs::MultiDOFJointTrajectory planLinearBezierCurve(const geometry_msgs::Point end_point, 
                                                                        const double time_step); 
 
+        // init flags
+        bool initPub = false;
+        bool initSub = false; 
         // CTL flags
         bool trashLocalized = false;
         bool poseReciv = false;
-        bool pickUpComplete = false; 
+        bool trajReciv = false; 
+        bool pickUpComplete = false;
+        bool firstTrajSent = false;
+        // lawn mower trajectory flags
+        int lawnmowerDir = 1; 
+        int w_i = 0;
+        double lastX, lastY;
+
         int start_time; 
 
         // UAV pose
         geometry_msgs::PoseStamped currentPose;
         geometry_msgs::PoseStamped targetPose; 
         geometry_msgs::Twist currentVel; 
+        
+        // Initialize starting state
+        State uavState = NOT_INIT; 
 
 }; 
 
