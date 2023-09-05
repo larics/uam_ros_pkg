@@ -116,7 +116,7 @@ trajectory_msgs::MultiDOFJointTrajectory UamRosLitterCtl::planLawnmowerTrajector
                                                                                    const float width,   
                                                                                    const double step_size)
 {
-    //TODO: Add parametrizable planning of the lawnmower trajectory 
+    //TODO: Add parametrizable planning of the lawnmower trajectory (take yaw in consideration)
     trajectory_msgs::MultiDOFJointTrajectory trajectory; 
     int area = static_cast<int>(length*width);
     int width_ = static_cast<int>(width);
@@ -137,7 +137,18 @@ trajectory_msgs::MultiDOFJointTrajectory UamRosLitterCtl::planLawnmowerTrajector
 
         if (std::fmod(lawnStep, width_) == 0.0 && i != 0){ 
             point.transforms[0].translation.y += wStep;
-            lawnmowerDir *= -1; 
+            if (lawnmowerDir == 1){
+                point.transforms[0].rotation.z = 1; 
+                point.transforms[0].rotation.w = 0; 
+
+            } 
+            else {
+                point.transforms[0].rotation.z = 0;                 
+                point.transforms[0].rotation.w = 1;
+            } 
+            lawnmowerDir *= -1;
+            //TODO: Add orientation change 
+
         }
         point.transforms[0].translation.z = currentPose.pose.position.z;
         point.transforms[0].rotation.x = 0;
