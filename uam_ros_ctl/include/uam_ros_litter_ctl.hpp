@@ -13,6 +13,7 @@
 #include <nav_msgs/Odometry.h>
 #include <trajectory_msgs/MultiDOFJointTrajectory.h>
 #include <trajectory_msgs/MultiDOFJointTrajectoryPoint.h>
+#include <std_srvs/Trigger.h>
 
 // Conversions 
 #include <tf/tf.h>
@@ -28,7 +29,7 @@ enum State
     //TODO: Maybe correlate with the mavros states
     NOT_INIT = 0,
     INIT=1,
-    TAKEOFF=2,
+    READY=2,
     SEARCH=3,
     PICKUP=4,
     DROPOFF=5,
@@ -60,14 +61,20 @@ class UamRosLitterCtl
         ros::Subscriber m_subCurrentPose; 
         ros::Subscriber m_subTracker;
 
+        // ROS Services
+        ros::ServiceServer m_readySrv; 
+
         // init methods
         bool initPublishers();
         bool initSubscribers();
+        bool initServices(); 
 
         // callbacks 
         void targetPoseCb(const geometry_msgs::Pose::ConstPtr& msg);
         void currentPoseCb(const nav_msgs::Odometry::ConstPtr& msg);
         void trackerCb(const trajectory_msgs::MultiDOFJointTrajectory trajectory);
+
+        bool readySrvCb(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
 
         // plan curves methods 
         trajectory_msgs::MultiDOFJointTrajectory planQuadraticBezierCurve(const geometry_msgs::Point start_point, 
@@ -85,6 +92,7 @@ class UamRosLitterCtl
         // init flags
         bool initPub = false;
         bool initSub = false; 
+        bool initSrv = false; 
         // CTL flags
         bool trashLocalized = false;
         bool poseReciv = false;
