@@ -48,7 +48,8 @@ bool UamRosLitterCtl::initServices()
 bool UamRosLitterCtl::readySrvCb(std_srvs::TriggerRequest &req, std_srvs::TriggerResponse &res)
 {
     ROS_INFO_NAMED("uam_ros_litter_ctl", "Ready service callback!");
-    uavState = READY;
+    //uavState = READY; --> set to search so we can call bezier ASAP on target
+    uavState = SEARCH; 
     return true;
 }
 
@@ -194,9 +195,9 @@ void UamRosLitterCtl::run() {
             //TODO: Add search state 
             double step_size = 0.5; 
             // TODO: Add current yaw to the trajectory
-            //trajectoryCmd = planLawnmowerTrajectory(10, 10, step_size);
-            //m_pubTrajectoryCmd.publish(trajectoryCmd);
-            //if (trajReciv = true) uavState = SEARCH;
+            trajectoryCmd = planLawnmowerTrajectory(10, 10, step_size);
+            m_pubTrajectoryCmd.publish(trajectoryCmd);
+            if (trajReciv = true) uavState = SEARCH;
         }
 
         // TODO: REFACTOR THIS!
