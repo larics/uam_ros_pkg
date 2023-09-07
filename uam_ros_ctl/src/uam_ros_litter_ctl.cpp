@@ -217,10 +217,10 @@ void UamRosLitterCtl::run() {
             start_point.z = currentPose.pose.position.z;
             control_point.x = currentPose.pose.position.x;
             control_point.y = currentPose.pose.position.y;
-            control_point.z = 0;
+            control_point.z = 0.5;
             goal_point.x = targetPose.position.x;
             goal_point.y = targetPose.position.y;
-            goal_point.z = 0.75;
+            goal_point.z = targetPose.position.z;
 
             ROS_INFO_NAMED("uam_ros_litter_ctl", "Publishing trajectory command!");
             trajectoryCmd = planQuadraticBezierCurve(start_point, control_point, goal_point, 0.05);       
