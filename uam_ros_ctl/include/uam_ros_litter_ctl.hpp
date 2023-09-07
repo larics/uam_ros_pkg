@@ -32,8 +32,7 @@ enum State
     READY=2,
     SEARCH=3,
     PICKUP=4,
-    DROPOFF=5,
-    LAND=6
+    PICKUP_COMPLETE=5
 };
 
 
@@ -73,8 +72,10 @@ class UamRosLitterCtl
         void targetPoseCb(const geometry_msgs::Pose::ConstPtr& msg);
         void currentPoseCb(const nav_msgs::Odometry::ConstPtr& msg);
         void trackerCb(const trajectory_msgs::MultiDOFJointTrajectory trajectory);
-
         bool readySrvCb(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+
+        // simple methods
+        float switchVal(float val); 
 
         // plan curves methods 
         trajectory_msgs::MultiDOFJointTrajectory planQuadraticBezierCurve(const geometry_msgs::Point start_point, 
@@ -102,13 +103,13 @@ class UamRosLitterCtl
         // lawn mower trajectory flags
         int lawnmowerDir = 1; 
         int w_i = 0;
-        double lastX, lastY;
+        double lastX, lastY, lastRotW, lastRotZ; 
 
         int start_time; 
 
         // UAV pose
+        geometry_msgs::Pose targetPose; 
         geometry_msgs::PoseStamped currentPose;
-        geometry_msgs::PoseStamped targetPose; 
         geometry_msgs::Twist currentVel; 
         
         // Initialize starting state

@@ -56,6 +56,8 @@ void UamRosLitterCtl::targetPoseCb(const geometry_msgs::Pose::ConstPtr& msg)
 {
     ROS_INFO_NAMED("uam_ros_litter_ctl", "Target pose callback!");
     trashLocalized = true;
+    targetPose.position = msg->position;
+    targetPose.orientation = msg->orientation;
 }
 
 void UamRosLitterCtl::currentPoseCb(const nav_msgs::Odometry::ConstPtr& msg)
@@ -78,6 +80,10 @@ void UamRosLitterCtl::trackerCb(const trajectory_msgs::MultiDOFJointTrajectory t
     }
 }
 
+float UamRosLitterCtl::switchVal(float val){
+    if (std::abs(1-val) < 1e-3) return 1; 
+    else return 0;
+}
 
 trajectory_msgs::MultiDOFJointTrajectory UamRosLitterCtl::planQuadraticBezierCurve(const geometry_msgs::Point start_point,
                                                                                    const geometry_msgs::Point control_point, 
@@ -140,6 +146,7 @@ trajectory_msgs::MultiDOFJointTrajectory UamRosLitterCtl::planLawnmowerTrajector
     wStep = width_/wStep;
 
     lastX = currentPose.pose.position.x; lastY = currentPose.pose.position.y;
+    lastRotZ = currentPose.pose.orientation.z; lastRotW = currentPose.pose.orientation.w;
 
     // TODO: Generalize!
     for (int i = 0; i < N; i++){
@@ -152,26 +159,24 @@ trajectory_msgs::MultiDOFJointTrajectory UamRosLitterCtl::planLawnmowerTrajector
 
         if (std::fmod(lawnStep, width_) == 0.0 && i != 0){ 
             point.transforms[0].translation.y += wStep;
-            if (lawnmowerDir > 0){
-                point.transforms[0].rotation.z = 1; 
-                point.transforms[0].rotation.w = 0; 
-            } 
-            else {
-                point.transforms[0].rotation.z = 0;                 
-                point.transforms[0].rotation.w = 1;
-            } 
             lawnmowerDir *= -1;
+            // Switch Z and W for rotation 
+            lastRotW = switchVal(lastRotW);
+            lastRotZ = switchVal(lastRotZ);
             //TODO: Add orientation change 
-
         }
         point.transforms[0].translation.z = currentPose.pose.position.z;
         point.transforms[0].rotation.x = 0;
         point.transforms[0].rotation.y = 0;
+        point.transforms[0].rotation.z = lastRotZ;
+        point.transforms[0].rotation.w = lastRotW; 
+
         point.time_from_start = ros::Duration(i*step_size);
         trajectory.points.push_back(point);
         // lastX, lastY
         lastX = point.transforms[0].translation.x;
         lastY = point.transforms[0].translation.y;  
+
     }
 
     return trajectory; 
@@ -184,23 +189,19 @@ void UamRosLitterCtl::run() {
     ros::Rate loop_rate(10);
     while (ros::ok())
     {   
-        
-        ROS_INFO_THROTTLE_NAMED(1, "uam_ros_litter_ctl", "Running!");
-        ROS_INFO_THROTTLE_NAMED(1, "uam_ros_litter_ctl", "Current state: %d", uavState);
         trajectory_msgs::MultiDOFJointTrajectory trajectoryCmd; 
-        if (!trashLocalized && uavState == READY){
+        if (uavState == READY){
             //TODO: Add search state 
-            double step_size = 0.05; 
+            double step_size = 0.5; 
             // TODO: Add current yaw to the trajectory
-            trajectoryCmd = planLawnmowerTrajectory(10, 10, step_size);
-            ROS_INFO_STREAM("Publishing trajectory command!");
-            m_pubTrajectoryCmd.publish(trajectoryCmd);
-            if (trajReciv = true) uavState = SEARCH;
+            //trajectoryCmd = planLawnmowerTrajectory(10, 10, step_size);
+            //m_pubTrajectoryCmd.publish(trajectoryCmd);
+            //if (trajReciv = true) uavState = SEARCH;
         }
 
         // TODO: REFACTOR THIS!
         // TODO: Think of a state machine control (Maybe there's even something implemented))
-        if (trashLocalized && poseReciv && uavState == SEARCH) {
+        if (trashLocalized && uavState == SEARCH) {
             
             // TODO: For uav grab current pose 0
             // TODO: For cp grab pose without height
@@ -209,7 +210,6 @@ void UamRosLitterCtl::run() {
             //"cp": (9, 8, 1), 
             //"goal": (3, 8, 1)}
 
-
             geometry_msgs::Point start_point, control_point, goal_point;
             start_point.x = currentPose.pose.position.x;
             start_point.y = currentPose.pose.position.y;
@@ -217,22 +217,21 @@ void UamRosLitterCtl::run() {
             control_point.x = currentPose.pose.position.x;
             control_point.y = currentPose.pose.position.y;
             control_point.z = 0;
-            goal_point.x = targetPose.pose.position.x;
-            goal_point.y = targetPose.pose.position.y;
-            goal_point.z = 1;
+            goal_point.x = targetPose.position.x;
+            goal_point.y = targetPose.position.y;
+            goal_point.z = 0.75;
 
             ROS_INFO_NAMED("uam_ros_litter_ctl", "Publishing trajectory command!");
             trajectoryCmd = planQuadraticBezierCurve(start_point, control_point, goal_point, 0.05);       
             m_pubTrajectoryCmd.publish(trajectoryCmd);  
             start_time = ros::Time::now().toSec();
-            trashLocalized = false;
+            uavState = PICKUP; 
         }
 
         int timeout = 3.0; 
         int elapsed = ros::Time::now().toSec() - start_time;
-        /*
-        if (!pickUpComplete && elapsed > timeout){
-            if (std::abs(currentVel.linear.x) < 0.05 && std::abs(currentVel.linear.y) < 0.05 && std::abs(currentVel.linear.z)< 0.05)
+        if (!pickUpComplete && elapsed > timeout && uavState == PICKUP){
+            if (std::abs(currentVel.linear.x) < 0.1 && std::abs(currentVel.linear.y) < 0.1 && std::abs(currentVel.linear.z)< 0.05)
             {
                 ROS_INFO_NAMED("uam_ros_litter_ctl", "Pickup complete!"); 
                 pickUpComplete = true;
@@ -241,7 +240,9 @@ void UamRosLitterCtl::run() {
             {
                 ROS_INFO("Current velocity: [%f, %f, %f]", currentVel.linear.x, currentVel.linear.y, currentVel.linear.z);
             }
+            uavState = PICKUP_COMPLETE;
         }
+        /*
 
         if (pickUpComplete){
 
@@ -257,6 +258,7 @@ void UamRosLitterCtl::run() {
         }
         //ROS_INFO_NAMED("uam_ros_ctl", "running...");
         */
+
         ros::spinOnce();
         loop_rate.sleep();
     }
