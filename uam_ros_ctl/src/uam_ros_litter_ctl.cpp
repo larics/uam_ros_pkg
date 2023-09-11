@@ -134,6 +134,22 @@ trajectory_msgs::MultiDOFJointTrajectory UamRosLitterCtl::planQuadraticBezierCur
     return trajectory; 
 }
 
+
+trajectory_msgs::MultiDOFJointTrajectory UamRosLitterCtl::resampleAndMergeTrajectories(const trajectory_msgs::MultiDOFJointTrajectory& traj1, 
+                                                                                       const trajectory_msgs::MultiDOFJointTrajectory& traj2)
+{
+    ROS_INFO_NAMED("uam_ros_litter_ctl", "Resampling and merging trajectories!");
+    trajectory_msgs::MultiDOFJointTrajectory trajectoryCmd;
+    for(int i = 0; i < traj1.points.size(); i++){
+        trajectoryCmd.points.push_back(traj1.points[i]);
+    }
+    // Remove first point!
+    for(int i= 1; i < traj2.points.size(); i++){
+        trajectoryCmd.points.push_back(traj2.points[i]);
+    }
+
+    return trajectoryCmd;
+}
 trajectory_msgs::MultiDOFJointTrajectory UamRosLitterCtl::planLawnmowerTrajectory( const float length,
                                                                                    const float width,   
                                                                                    const double step_size)
@@ -211,20 +227,43 @@ void UamRosLitterCtl::run() {
             //"cp": (9, 8, 1), 
             //"goal": (3, 8, 1)}
 
-            geometry_msgs::Point start_point, control_point, goal_point;
+            geometry_msgs::Point start_point, control_point1, goal_point;
             start_point.x = currentPose.pose.position.x;
             start_point.y = currentPose.pose.position.y;
             start_point.z = currentPose.pose.position.z;
-            control_point.x = currentPose.pose.position.x;
-            control_point.y = currentPose.pose.position.y;
-            control_point.z = 0.5;
+            control_point1.x = currentPose.pose.position.x;
+            control_point1.y = currentPose.pose.position.y;
+            control_point1.z = 0.75;
             goal_point.x = targetPose.position.x;
             goal_point.y = targetPose.position.y;
             goal_point.z = targetPose.position.z;
 
-            ROS_INFO_NAMED("uam_ros_litter_ctl", "Publishing trajectory command!");
-            trajectoryCmd = planQuadraticBezierCurve(start_point, control_point, goal_point, 0.05);       
-            m_pubTrajectoryCmd.publish(trajectoryCmd);  
+            float time_step = 0.05;
+            bool single = false; 
+            if (single){
+                trajectoryCmd = planQuadraticBezierCurve(start_point, control_point1, goal_point, time_step);
+                m_pubTrajectoryCmd.publish(trajectoryCmd);
+            }else{
+                geometry_msgs::Point control_point2, end_point;
+                trajectory_msgs::MultiDOFJointTrajectory traj1, traj2, trajComplete; 
+                float x_dist = std::abs(start_point.x - goal_point.x);
+                float y_dist = std::abs(start_point.y - goal_point.y);
+                control_point2.x = goal_point.x + x_dist;
+                control_point2.y = goal_point.y + y_dist;
+                control_point2.z = 0.75;
+                end_point.x = control_point2.x;
+                end_point.y = control_point2.y;
+                end_point.z = start_point.z;
+
+                traj1 = planQuadraticBezierCurve(start_point, control_point1, goal_point, time_step);
+                traj2 = planQuadraticBezierCurve(goal_point, control_point2, end_point, time_step);
+                trajComplete = resampleAndMergeTrajectories(traj1, traj2);
+                ROS_INFO_STREAM("Full trajectory: " << trajComplete); 
+                m_pubTrajectoryCmd.publish(trajComplete);                 
+                
+            }
+            
+            
             start_time = ros::Time::now().toSec();
             uavState = PICKUP; 
         }

@@ -83,12 +83,28 @@ class UamRosLitterCtl
                                                                            const geometry_msgs::Point control_point, 
                                                                            const double time_step);
 
+        trajectory_msgs::MultiDOFJointTrajectory resampleAndMergeTrajectories(const trajectory_msgs::MultiDOFJointTrajectory &traj1, 
+                                                                               const trajectory_msgs::MultiDOFJointTrajectory &traj2);
+
         trajectory_msgs::MultiDOFJointTrajectory planLawnmowerTrajectory(const float length,
                                                                          const float width,   
                                                                          const double step_size);
 
         trajectory_msgs::MultiDOFJointTrajectory planLinearBezierCurve(const geometry_msgs::Point end_point, 
                                                                        const double time_step); 
+
+
+        void planAndPublishOneBezierCurve(const geometry_msgs::Point start_point,
+                                                           const geometry_msgs::Point control_p, 
+                                                           const geometry_msgs::Point end_point, 
+                                                           double step_size);
+
+        void planAndPublishDoubleBezierCurve(const geometry_msgs::Point start_point,
+                                                              const geometry_msgs::Point control_point1, 
+                                                              const geometry_msgs::Point catch_point, 
+                                                              const geometry_msgs::Point control_point2, 
+                                                              const geometry_msgs::Point end_point); 
+                                                            
 
         // init flags
         bool initPub = false;
