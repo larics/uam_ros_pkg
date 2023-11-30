@@ -7,7 +7,7 @@
     <include file="$(find uam_moveit_config)/launch/demo_gazebo.launch"/>
 
     <!-- Start arm interface -->
-    <node pkg="uam_ros_ctl"  type="uam_ros_ctl_node" name="control_arm_node" output="screen" ns="red_manipulator">
+    <node pkg="uam_ros_ctl"  type="uam_ros_ctl_node" name="control_arm_node" output="screen">
         <param name="config_path" value="$(arg config_path)" />
     </node>
 

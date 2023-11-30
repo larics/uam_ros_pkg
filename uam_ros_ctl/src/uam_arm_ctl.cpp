@@ -668,6 +668,7 @@ void ControlArm::run() {
     // Get all joints
     m_jointModelGroupPtr = m_currentRobotStatePtr->getJointModelGroup(GROUP_NAME);
 
+    // EE_LINK_NAME=
     Eigen::Affine3d currentPose_ = m_moveGroupPtr->getCurrentState()->getFrameTransform(EE_LINK_NAME);
     geometry_msgs::Pose currentROSPose_; tf::poseEigenToMsg(currentPose_, currentROSPose_);
     currentPosePublisher_.publish(currentROSPose_);
