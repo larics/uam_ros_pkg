@@ -25,6 +25,9 @@ roslaunch uam_moveit_config demo.launch
 
 After running kopterworx with the aerial manipulator from `ardupilot_gazebo` package. 
 
+### Comments
+
+If you want to edit spawn pose of the robot manipulator, edit `demo_gazebo.launch` arguments. 
 
 ## TODO: 
 
@@ -33,7 +36,7 @@ After running kopterworx with the aerial manipulator from `ardupilot_gazebo` pac
 - [x] Add joint limits 
 - [x] Change planner 
 - [x] Test moveit movement
-- [ ] Enable `control_arm_node` 
+- [x] Enable `control_arm_node` 
 - [ ] Enable joint commands
 - [ ] Publish end effector position on the topic 
 - [ ] Add functionality for simple trajectory execution

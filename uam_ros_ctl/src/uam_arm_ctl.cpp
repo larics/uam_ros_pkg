@@ -39,6 +39,9 @@ void ControlArm::init() {
 
   planningSceneInitialized_ = setPlanningScene();
 
+  // Choose default planner
+  m_moveGroupPtr->setPlannerId("RRT");
+
   // Initialize publishers and subscribers;
   std::string displayTrajectoryTopicName;
   int displayTrajectoryQueueSize;
