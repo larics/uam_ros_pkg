@@ -1,5 +1,5 @@
 #include <ros/ros.h>
-#include "control_arm.h"
+#include "uam_arm_ctl.hpp"
 
 int main(int argc, char** argv) {
     ros::init(argc, argv, "control_arm");

@@ -1,4 +1,4 @@
-#include "control_arm.h"
+#include "uam_arm_ctl.hpp"
 
 ControlArm::ControlArm(ros::NodeHandle nh) : nodeHandle_(nh) {
 

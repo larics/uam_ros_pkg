@@ -18,6 +18,7 @@ find_package(catkin REQUIRED
     roscpp
     std_msgs
     tf
+    eigen_conversions
 )
 
 find_package(Eigen3 REQUIRED)
@@ -38,6 +39,7 @@ catkin_package(
         roscpp 
         std_msgs
         tf
+        eigen_conversions
     DEPENDS 
         Eigen3 
         message_runtime  
@@ -52,6 +54,7 @@ include_directories(
 #########
 set(PROJECT_LIB_FILES
     src/uam_ros_ctl.cpp
+    src/uam_arm_ctl.cpp
     src/uam_ros_litter_ctl.cpp
 )
 
@@ -80,6 +83,18 @@ add_executable(
 
 target_link_libraries(
     uam_ros_litter_ctl_node
+    uam_ros_ctl_lib
+    ${EIGEN3_LIBRARIES}
+    ${catkin_LIBRARIES}
+)
+
+add_executable(
+    uam_arm_ctl_node
+    src/uam_arm_ctl_node.cpp
+)
+
+target_link_libraries(
+    uam_arm_ctl_node
     uam_ros_ctl_lib
     ${EIGEN3_LIBRARIES}
     ${catkin_LIBRARIES}

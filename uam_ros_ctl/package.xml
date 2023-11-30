@@ -23,6 +23,7 @@
   <depend>moveit_ros_move_group</depend>
   <depend>moveit_msgs</depend>
   <depend>tf</depend>
+  <depend>eigen_conversions</depend>
   <exec_depend>message_runtime</exec_depend>
 
 
