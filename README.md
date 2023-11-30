@@ -33,7 +33,7 @@ After running kopterworx with the aerial manipulator from `ardupilot_gazebo` pac
 - [x] Add joint limits 
 - [x] Change planner 
 - [x] Test moveit movement
-- [ ] Enable ``control_arm_node` 
+- [ ] Enable `control_arm_node` 
 - [ ] Enable joint commands
 - [ ] Publish end effector position on the topic 
 - [ ] Add functionality for simple trajectory execution
