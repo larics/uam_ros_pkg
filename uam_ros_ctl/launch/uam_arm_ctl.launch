@@ -2,12 +2,13 @@
 
     <!-- Arguments-->
     <arg name="config_path" value="$(find uam_ros_ctl)/config/topics.yaml"/>
+    <param name="use_sim_time" value="false"/>
     
     <!-- Start Gazebo + MoveIt!-->
     <include file="$(find uam_moveit_config)/launch/demo_gazebo.launch"/>
 
     <!-- Start arm interface -->
-    <node pkg="uam_ros_ctl"  type="uam_ros_ctl_node" name="control_arm_node" output="screen">
+    <node pkg="uam_ros_ctl"  type="uam_arm_ctl_node" name="control_arm" output="screen">
         <param name="config_path" value="$(arg config_path)" />
     </node>
 
