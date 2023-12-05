@@ -1,4 +1,4 @@
-# uam_ros_pkg
+ž# uam_ros_pkg
 
 ROS pkg for aerial manipulators used on `kopterworx` UAV. 
 
@@ -37,7 +37,12 @@ If you want to edit spawn pose of the robot manipulator, edit `demo_gazebo.launc
 - [x] Change planner 
 - [x] Test moveit movement
 - [x] Enable `control_arm_node` 
+- [x] Publish end effector position on the topic
+- [x] Added topic relay for the moveit (state publishing) 
+- [ ] Test with different planning frame on the UAV 
+- [ ] Test with moveit servo 
+- [ ] Filter out topics that are needed, and ones that are not!
 - [ ] Enable joint commands
-- [ ] Publish end effector position on the topic 
 - [ ] Add functionality for simple trajectory execution
 - [ ] Test on real UAM (real manipulator) 
+- [ ] REFACTOR EVERYTHING! 

@@ -46,65 +46,25 @@ void ControlArm::init() {
   m_moveGroupPtr->setPlannerId("RRT");
 
   // Initialize publishers and subscribers;
-  std::string displayTrajectoryTopicName;
-  int displayTrajectoryQueueSize;
-  std::string currentPoseTopicName;
-  int currentPoseTopicQueueSize;
-  std::string cmdPoseTopicName;
-  int cmdPoseTopicQueueSize;
-  std::string cmdToolOrientationTopicName;
-  int cmdToolOrientationTopicQueueSize;
-  std::string cmdDeltaPoseTopicName;
-  int cmdDeltaPoseTopicQueueSize;
-  int currentJointCmdQueueSize;
+  std::string displayTrajectoryTopicName = "move_group/display_planned_path";
+  int displayTrajectoryQueueSize = 1; 
+  std::string currentPoseTopicName = "tool/current_pose";
+  int currentPoseTopicQueueSize = 1; 
+  std::string cmdPoseTopicName = "arm/command_pose"; 
+  int cmdPoseTopicQueueSize = 1; 
+  std::string cmdToolOrientationTopicName = "tool/command/orientation"; 
+  int cmdToolOrientationTopicQueueSize = 1; 
+  std::string cmdDeltaPoseTopicName = "arm/command/delta_pose";
+  int cmdDeltaPoseTopicQueueSize = 1; 
+  int currentJointCmdQueueSize = 1; 
 
-  std::string disableCollisionServiceName;
-  std::string addCollisionObjectServiceName;
-  std::string startPositionControllersServiceName;
-  std::string startJointTrajectoryControllerServiceName;
-  std::string startJointGroupPositionControllerServiceName;
-  std::string startJointGroupVelocityControllerServiceName;
+  std::string disableCollisionServiceName = "tool/disable_collision";
+  std::string addCollisionObjectServiceName = "scene/add_collisions"; 
+  std::string startPositionControllersServiceName = "controllers/start_position_controllers"; 
+  std::string startJointTrajectoryControllerServiceName = "controllers/start_joint_trajectory_controller";
+  std::string startJointGroupPositionControllerServiceName = "controllers/start_joint_group_position_controller";
+  std::string startJointGroupVelocityControllerServiceName = "controllers/start_joint_group_velocity_controller"; 
 
-  nodeHandle_.param("publishers/display_trajectory_topic",
-                    displayTrajectoryTopicName,
-                    std::string("move_group/display_planned_path"));
-  nodeHandle_.param("publishers/queue_size", displayTrajectoryQueueSize, 1);
-  nodeHandle_.param("publishers/current_pose", currentPoseTopicName,
-                    std::string("tool/current_pose"));
-  nodeHandle_.param("publishers/queue_size", currentPoseTopicQueueSize, 1);
-
-  nodeHandle_.param("subscribers/cmd_pose_topic", cmdPoseTopicName,
-                    std::string("arm/command/pose"));
-  nodeHandle_.param("subscribers/queue_size", cmdPoseTopicQueueSize, 1);
-  nodeHandle_.param("subscribers/cmd_tool_orientation_topic",
-                    cmdToolOrientationTopicName,
-                    std::string("tool/command/orientation"));
-  nodeHandle_.param("subscribers/queue_size", cmdToolOrientationTopicQueueSize,
-                    1);
-  nodeHandle_.param("subscribers/cmd_delta_pose_topic", cmdDeltaPoseTopicName,
-                    std::string("arm/command/delta_pose"));
-  nodeHandle_.param("subscribers/queue_size", cmdDeltaPoseTopicQueueSize, 1);
-  nodeHandle_.param("services/disable_collision_service",
-                    disableCollisionServiceName,
-                    std::string("tool/disable_collision"));
-  nodeHandle_.param("services/add_collision_object",
-                    addCollisionObjectServiceName,
-                    std::string("scene/add_collisions"));
-  nodeHandle_.param("services/start_position_controllers",
-                    startPositionControllersServiceName,
-                    std::string("controllers/start_position_controllers"));
-  nodeHandle_.param(
-      "services/start_joint_trajectory_controller",
-      startJointTrajectoryControllerServiceName,
-      std::string("controllers/start_joint_trajectory_controller"));
-  nodeHandle_.param(
-      "services/start_joint_group_position_controller",
-      startJointGroupPositionControllerServiceName,
-      std::string("controllers/start_joint_group_position_controller"));
-  nodeHandle_.param(
-      "services/start_joint_group_velocity_controller",
-      startJointGroupVelocityControllerServiceName,
-      std::string("controllers/start_joint_group_velocity_controller"));
 
   ROS_INFO("[ControlArm] Initializing subscribers/publishers...");
   displayTrajectoryPublisher_ =
@@ -663,8 +623,6 @@ float ControlArm::round(float var) {
 void ControlArm::run() {
 
   ros::Rate r(25);
-  //float sleepT = 10.0; 
-  //ros::Duration(sleepT).sleep();
 
   while (ros::ok) {
 
