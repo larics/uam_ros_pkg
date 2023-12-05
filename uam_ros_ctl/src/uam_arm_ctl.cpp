@@ -11,7 +11,9 @@ ControlArm::ControlArm(ros::NodeHandle nh) : nodeHandle_(nh) {
 
   // Initial sleep (waiting for move group and rest of the MoveIt stuff to
   // initialize.)
-  usleep(sleepMs_);
+
+  usleep(sleepMs_); 
+  // TODO: Add waiting for the MoveIt!
 
   // Initialize class
   init();
@@ -26,13 +28,14 @@ bool ControlArm::readParameters() {
   // Load common parameters
   nodeHandle_.param("visualization/enable_viz", enableVisualization_, true);
   nodeHandle_.param("init/sleep_time", sleepMs_, 20000000);
+  ROS_INFO_STREAM("Reading parameters!"); 
 
   return true;
 }
 
 void ControlArm::init() {
 
-  ROS_INFO("[ControlArm] Started node initialization.");
+  ROS_INFO_STREAM("[ControlArm] Started node initialization.");
 
   // Set main move group
   moveGroupInitialized_ = setMoveGroup();
@@ -660,12 +663,15 @@ float ControlArm::round(float var) {
 void ControlArm::run() {
 
   ros::Rate r(25);
+  //float sleepT = 10.0; 
+  //ros::Duration(sleepT).sleep();
 
   while (ros::ok) {
+
     // Get current joint position for every joint in robot arm
     getCurrentArmState();
 
-    // Get all joints
+    // Get all joints --> this one fails?!
     m_jointModelGroupPtr = m_currentRobotStatePtr->getJointModelGroup(GROUP_NAME);
 
     // EE_LINK_NAME=
