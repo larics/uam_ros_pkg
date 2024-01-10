@@ -2,7 +2,7 @@
 
     <!-- Arguments-->
     <arg name="config_path" value="$(find uam_ros_ctl)/config/topics.yaml"/>
-    <param name="use_sim_time" value="false"/>
+    <param name="use_sim_time" value="true"/>
     
     <!-- Start Gazebo + MoveIt!-->
     <include file="$(find uam_moveit_config)/launch/demo_gazebo.launch"/>
