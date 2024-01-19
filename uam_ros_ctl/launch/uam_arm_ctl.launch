@@ -12,6 +12,6 @@
         <param name="config_path" value="$(arg config_path)" />
     </node>
 
-    <node pkg="topic_tools" type="relay" name="joint_states_relay" output="screen" args="red/manipulator/joint_states joint_states"/>
+    <node pkg="topic_tools" type="relay" name="joint_states_relay" output="screen" args="red_manipulator/joint_states joint_states"/>
 
 </launch>

@@ -2,7 +2,7 @@
   <!-- This file summarizes all settings required for trajectory execution  -->
 
   <!-- Define moveit controller manager plugin: fake, simple, or ros_control -->
-  <arg name="moveit_controller_manager" />
+  <arg name="moveit_controller_manager" default="simple" />
   <arg name="fake_execution_type" default="interpolate" />
 
   <!-- Flag indicating whether MoveIt is allowed to load/unload  or switch controllers -->
