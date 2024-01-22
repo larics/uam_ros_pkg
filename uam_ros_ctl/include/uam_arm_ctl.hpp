@@ -188,7 +188,7 @@ private:
 
   // Have to rebuild each time when this is changes, TODO: Add some config for that
   static constexpr auto GROUP_NAME = "arm"; 
-  static constexpr auto EE_LINK_NAME = "end_effector"; 
+  static constexpr auto EE_LINK_NAME = "end_effector_base"; 
 
 };
 

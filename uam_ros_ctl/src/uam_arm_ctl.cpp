@@ -233,7 +233,10 @@ void ControlArm::cmdToolOrientationCallback(
 
 bool ControlArm::sendToCmdPose() {
 
-  setCmdPose();
+  // Set CmdPose to moveit interface class - PROLAZI
+  bool successCmdPose = setCmdPose();
+  ROS_INFO("[ControlArm] Set CmdPose: %s",
+           successCmdPose ? "SUCCESS" : "FAILED");
 
   // Call planner, compute plan and visualize it
   moveit::planning_interface::MoveGroupInterface::Plan plannedPath;
@@ -243,7 +246,7 @@ bool ControlArm::sendToCmdPose() {
                   moveit::planning_interface::MoveItErrorCode::SUCCESS);
 
   ROS_INFO("[ControlArm] Visualizing plan 1 (pose goal) %s",
-           success ? "" : "FAILED");
+           success ? "SUCCESS" : "FAILED");
 
   // Requires async spinner to work (Added asyncMove/non-blocking)
   if (success) {
@@ -272,7 +275,7 @@ bool ControlArm::sendToDeltaCmdPose() {
   // populate m_cmd pose
   Eigen::Affine3d currentPose_ =
       m_moveGroupPtr->getCurrentState()->getFrameTransform(
-          "lwa4p_link6"); // Currently lwa4p_link6, possible to use end effector
+          EE_LINK_NAME); // Currently lwa4p_link6, possible to use end effector
                           // link
   geometry_msgs::Pose currentROSPose_;
   tf::poseEigenToMsg(currentPose_, currentROSPose_);
@@ -556,6 +559,7 @@ void ControlArm::getCurrentArmState() {
 
   // method is more like refresh current kinematic state
   // (getCurrentKinematicState)
+
   m_currentRobotStatePtr = m_moveGroupPtr->getCurrentState();
 }
 
@@ -565,7 +569,7 @@ void ControlArm::getCurrentEndEffectorState(
   m_endEffectorState =
       m_currentRobotStatePtr->getGlobalLinkTransform(endEffectorLinkName);
 
-  bool debug = false;
+  bool debug = true;
   if (debug) {
 
     ROS_INFO_STREAM("Translation: \n"
@@ -623,18 +627,29 @@ float ControlArm::round(float var) {
 void ControlArm::run() {
 
   ros::Rate r(25);
-
+  m_moveGroupPtr->setPlanningTime(15.0);
+  //m_moveGroupPtr->setGoalOrientationTolerance(0.1);
+  //m_moveGroupPtr->setGoalPositionTolerance(0.1);
   while (ros::ok) {
 
     // Get current joint position for every joint in robot arm
     getCurrentArmState();
+    
+
+    //actionlib::SimpleActionClient<moveit_msgs::MoveGroupAction_<std::allocator<void>>> action_client = m_moveGroupPtr->getMoveGroupClient();
+
+    // Get the action server name
+  
+    //std::string action_server_name = action_client->getName();
+    //ROS_INFO("MoveGroup Action Server: %s", action_server_name.c_str());
 
     // Get all joints --> this one fails?!
     m_jointModelGroupPtr = m_currentRobotStatePtr->getJointModelGroup(GROUP_NAME);
 
     // EE_LINK_NAME=
     Eigen::Affine3d currentPose_ = m_moveGroupPtr->getCurrentState()->getFrameTransform(EE_LINK_NAME);
-    geometry_msgs::Pose currentROSPose_; tf::poseEigenToMsg(currentPose_, currentROSPose_);
+    geometry_msgs::Pose currentROSPose_; 
+    tf::poseEigenToMsg(currentPose_, currentROSPose_);
     currentPosePublisher_.publish(currentROSPose_);
 
     // Sleep

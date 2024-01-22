@@ -8,9 +8,9 @@
     <include file="$(find uam_moveit_config)/launch/demo_gazebo.launch"/>
 
     <!-- Start arm interface -->
-    <node pkg="uam_ros_ctl"  type="uam_arm_ctl_node" name="control_arm" output="screen">
+    <!-- <node pkg="uam_ros_ctl"  type="uam_arm_ctl_node" name="control_arm" output="screen">
         <param name="config_path" value="$(arg config_path)" />
-    </node>
+    </node>-->
 
     <node pkg="topic_tools" type="relay" name="joint_states_relay" output="screen" args="red_manipulator/joint_states joint_states"/>
 
