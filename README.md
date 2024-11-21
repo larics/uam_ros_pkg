@@ -1,4 +1,4 @@
-ž# uam_ros_pkg
+# uam_ros_pkg
 
 ROS pkg for aerial manipulators used on `kopterworx` UAV. 
 
