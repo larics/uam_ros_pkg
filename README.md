@@ -29,6 +29,29 @@ After running kopterworx with the aerial manipulator from `ardupilot_gazebo` pac
 
 If you want to edit spawn pose of the robot manipulator, edit `demo_gazebo.launch` arguments. 
 
+### Deps
+
+Currently docker misses some dependencies so it is neccessary to install them by hand as follows: 
+```
+sudo apt-get install ros-noetic-topic-tools \
+	ros-noetic-controller-manager \
+	ros-noetic-rviz \
+	ros-noetic-moveit \
+	ros-noetic-moveit-simple-controller-manager
+```
+
+After that run: 
+`source /opt/ros/noetic/setup.bash
+cd /root/catkin_ws
+catkin build
+`
+
+And then you can run 
+```
+roslaunch uam_ros_pkg uam_ros_ctl.launch
+```
+
+
 ## TODO: 
 
 - [x] Enable simple control of the real manipulator (remapping moveit trajectory) 
