@@ -82,6 +82,10 @@
 
   <!-- Start the actual move_group node/action server -->
   <node name="move_group" launch-prefix="$(arg launch_prefix)" pkg="moveit_ros_move_group" type="move_group" respawn="false" output="screen" args="$(arg command_args)">
+    <remap 
+      from="joint_states"
+      to="arm_joint_states"
+    />
 
     <!-- <param name="moveit_controller_manager" value="moveit_ros_control_interface::MoveItMultiControllerManager" /> -->
 

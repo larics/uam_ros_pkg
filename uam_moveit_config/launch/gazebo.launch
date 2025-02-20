@@ -10,7 +10,7 @@
 
 
   <!-- Set the robot urdf on the parameter server -->
-  <param name="robot_description" command="xacro  '$(find ardupilot_gazebo)/models/manipulator/urdf/asap_manipulator_moveit.base.urdf.xacro'" />
+  <param name="robot_description" command="xacro  '$(find ardupilot_gazebo)/models/manipulator/urdf/new_order_manipulator_moveit.base.urdf.xacro'" />
 
   <!-- Unpause the simulation after loading the robot model -->
   <arg name="unpause" value="$(eval '' if arg('paused') else '-unpause')" />

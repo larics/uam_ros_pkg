@@ -9,13 +9,14 @@ generic_hw_control_loop:
 # Settings for ros_control hardware interface
 hardware_interface:
     joints:
-        - joint1
-        - joint2
-        - joint3
-        - joint4
+        - arm_joint1
+        - arm_joint2
+        - arm_joint3
+        - arm_joint4
+        - arm_joint5
     sim_control_mode: 0
 
-red_manipulator: 
+red/manipulator: 
         joint_state_controller:
             type: joint_state_controller/JointStateController
             publish_rate: 50
@@ -23,23 +24,23 @@ red_manipulator:
         arm_controller:
             type: position_controllers/JointTrajectoryController
             joints:
-                - joint1
-                - joint2
-                - joint3
-                - joint4
-
+                - arm_joint1
+                - arm_joint2
+                - arm_joint3
+                - arm_joint4
+                - arm_joint5
             constraints:
                 goal_time: 2.0
                 state_publish_rate: 25
 
-
 controller_list:
-    - name: red_manipulator/arm_controller
+    - name: red/manipulator/arm_controller
       action_ns: follow_joint_trajectory
       type: FollowJointTrajectory
       default: true
       joints: 
-        - joint1 
-        - joint2
-        - joint3
-        - joint4
+        - arm_joint1 
+        - arm_joint2
+        - arm_joint3
+        - arm_joint4
+        - arm_joint5

@@ -19,6 +19,6 @@ def joint_state_callback(msg):
 
 if __name__ == "__main__":
     rospy.init_node("joint_state_filter")
-    pub = rospy.Publisher("/filtered_joint_states", JointState, queue_size=10)
+    pub = rospy.Publisher("/arm_joint_states", JointState, queue_size=5)
     rospy.Subscriber("/red/joint_states", JointState, joint_state_callback)
     rospy.spin()
