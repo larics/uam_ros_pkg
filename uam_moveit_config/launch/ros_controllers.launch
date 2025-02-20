@@ -10,14 +10,14 @@
   <!-- Load the controllers -->
   <!-- Ignoring because they're loaded beforehand! -->
   <group if="$(arg real_robot)">
-    <node ns="red_manipulator" name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
+    <node ns="red" name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
     output="screen" args="arm_controller "/>
   </group>
 
   <group unless="$(arg real_robot)">
   <!-- Load the controllers -->
 
-    <node ns="red_manipulator" name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
+    <node ns="red/manipulator" name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
     output="screen" args="joint_state_controller arm_controller"/>
 
    
