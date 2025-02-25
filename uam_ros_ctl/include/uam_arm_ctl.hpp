@@ -1,5 +1,5 @@
-#ifndef CONTROL_ARM_H
-#define CONTROL_ARM_H
+#ifndef UAM_ARM_CTL_HPP
+#define UAM_ARM_CTL_HPP
 
 #include <chrono>
 #include <cmath>
@@ -9,6 +9,8 @@
 #include <thread>
 #include <unistd.h>
 #include <vector>
+
+#include <yaml-cpp/yaml.h>
 
 // ROS
 #include <controller_manager_msgs/ListControllers.h>
@@ -27,7 +29,7 @@
 #include <tf2/convert.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
-// MoveIt
+// MoveIt!
 #include <moveit/collision_detection/collision_matrix.h>
 #include <moveit/move_group_interface/move_group_interface.h>
 #include <moveit/planning_scene/planning_scene.h>
@@ -41,6 +43,7 @@
 #include <moveit_msgs/GetPositionIKRequest.h>
 #include <moveit_msgs/GetPositionIKResponse.h>
 #include <moveit_msgs/PositionIKRequest.h>
+#include <moveit_servo/pose_tracking.h>
 
 // Conversions
 #include <eigen_conversions/eigen_msg.h>
@@ -50,6 +53,15 @@
 // Utils
 #include <tf2/LinearMath/Quaternion.h>
 
+// Custom service
+#include "uam_ros_ctl/getIk.h"
+#include "uam_ros_ctl/getIkRequest.h"
+#include "uam_ros_ctl/getIkResponse.h"
+#include "uam_ros_ctl/changeState.h"
+#include "uam_ros_ctl/changeStateRequest.h"
+#include "uam_ros_ctl/changeStateResponse.h"
+
+#define stringify( name ) #name
 
 class ControlArm {
 
@@ -68,7 +80,7 @@ public:
   bool setCmdPose();
   bool setMoveGroup();
   bool setPlanningScene();
-
+  
   // Getters
   void getBasicInfo();
 
@@ -84,81 +96,152 @@ public:
   // Run method
   void run();
 
-  // It's not possible to access private members of this class from another clas
+  // It's not possible to access private members of this class from another class
   // Link to issue that explains it:
   // https://stackoverflow.com/questions/18944451/how-to-make-a-derived-class-access-the-private-member-data
 private:
-  // Reads and verifies ROS parameters
-  bool readParameters();
 
   // Initialization method
-  void init();
+  void loadConfig(); 
+  void initRobot();
 
   // ROS node handle
-  ros::NodeHandle nodeHandle_;
-  ros::NodeHandle nodeHandleWithoutNs_;
+  ros::NodeHandle nH;
+  ros::NodeHandle nHns;
 
   // transformListener
   tf::TransformListener listener;
   tf::TransformBroadcaster broadcaster;
 
+  // Basic robot setup
+  std::string GROUP_NAME; 
+  std::string EE_LINK_NAME; 
+  int NUM_CART_PTS; 
+
+  // Topic names
+  std::string dispTrajTopicName; 
+  std::string currPoseTopicName;
+  std::string cmdPoseTopicName;
+  std::string cmdToolOrientTopicName;
+  std::string cmdDeltaPoseTopicName;
+
+  // Service names
+  std::string disableCollisionSrvName;
+  std::string addCollisionObjectSrvName;
+  std::string startPositionCtlSrvName;
+  std::string startJointTrajCtlSrvName;
+  std::string startJointGroupPosCtlSrvName;
+  std::string startJointGroupVelCtlSrvName;
+  std::string getIkSrvName; 
+  std::string changeRobotStateSrvName; 
+
+  // Topic queue sizes
+  int dispTrajQSize;
+  int currPoseQSize;
+  int cmdPoseQSize;
+  int cmdToolOrientQSize;
+  int cmdDeltaPoseQSize;
+
   // ROS Publishers
-  ros::Publisher displayTrajectoryPublisher_;
-  ros::Publisher currentPosePublisher_;
-  ros::Publisher cmdJoint1Publisher;
-  ros::Publisher cmdJointGroupPositionPublisher;
-  ros::Publisher cmdJointGroupVelocityPublisher;
+  ros::Publisher dispTrajPub;
+  ros::Publisher currPosePub;
+  ros::Publisher cmdQ1Pub;
+  ros::Publisher cmdJointGroupPositionPub;
+  ros::Publisher cmdJointGroupVelocityPub;
 
   // ROS Subscribers
-  ros::Subscriber armCmdPoseSubscriber_;
-  ros::Subscriber armCmdDeltaPoseSubscriber_;
-  ros::Subscriber armCmdToolOrientationSubscriber_;
+  ros::Subscriber cmdPoseSub;
+  ros::Subscriber cmdDeltaPoseSub;
+  ros::Subscriber cmdToolOrientSub;
 
   // ROS Services
-  ros::ServiceServer disableCollisionService_;
-  ros::ServiceServer addCollisionObjectService_;
-  ros::ServiceServer startPositionControllersService_;
-  ros::ServiceServer startJointTrajectoryControllerService_;
-  ros::ServiceServer startJointGroupPositionControllerService_;
-  ros::ServiceServer startJointGroupVelocityControllerService_;
+  ros::ServiceServer getIkSrv; 
+  ros::ServiceServer disableCollisionSrv;
+  ros::ServiceServer addCollisionObjectSrv;
+  ros::ServiceServer startPositionCtlSrv;
+  ros::ServiceServer startJointTrajCtlSrv;
+  ros::ServiceServer startJointGroupPositionCtlSrv;
+  ros::ServiceServer startJointGroupVelocityCtlSrv;
+  ros::ServiceServer changeRobotStateSrv; 
 
   // ROS Service clients
-  ros::ServiceClient applyPlanningSceneServiceClient_;
-  ros::ServiceClient realRobotDriverInitServiceClient_;
-  ros::ServiceClient addCollisionObjectServiceClient_;
-  ros::ServiceClient switchControllerServiceClient_;
-  ros::ServiceClient listControllersServiceClient_;
-  ros::ServiceClient switchToPositionControllerServiceClient_;
-  ros::ServiceClient switchToTrajectoryControllerServiceClient_;
+  ros::ServiceClient applyPlanningSceneSrvCli;
+  ros::ServiceClient realRobotDriverInitSrvCli;
+  ros::ServiceClient addCollisionObjectSrvCli;
+  ros::ServiceClient switchCtlSrvCli;
+  ros::ServiceClient listCtlSrvCli;
+  ros::ServiceClient switchToPositionCtlSrvCli;
+  ros::ServiceClient switchToTrajectoryCtlSrvCli;
 
   // ROS Subscriber Callback
-  void cmdPoseCallback(const geometry_msgs::Pose::ConstPtr &msg);
-  void cmdDeltaPoseCallback(const geometry_msgs::Pose::ConstPtr &msg);
-  void cmdToolOrientationCallback(const geometry_msgs::Point::ConstPtr &msg);
+  void cmdPoseCb(const geometry_msgs::Pose::ConstPtr &msg);
+  void cmdDeltaPoseCb(const geometry_msgs::Pose::ConstPtr &msg);
+  void cmdToolOrientationCb(const geometry_msgs::Point::ConstPtr &msg);
 
-  // ROS Services callbacks
-  bool disableCollisionServiceCallback(std_srvs::TriggerRequest &req,
-                                       std_srvs::TriggerResponse &res);
-  bool addCollisionObjectServiceCallback(std_srvs::TriggerRequest &req,
-                                         std_srvs::TriggerResponse &res);
-  bool startPositionControllers(std_srvs::TriggerRequest &req,
-                                std_srvs::TriggerResponse &res);
-  bool startJointTrajectoryController(std_srvs::TriggerRequest &req,
-                                      std_srvs::TriggerResponse &res);
-  bool startJointGroupPositionController(std_srvs::TriggerRequest &req,
-                                         std_srvs::TriggerResponse &res);
-  bool startJointGroupVelocityController(std_srvs::TriggerRequest &req,
-                                         std_srvs::TriggerResponse &res);
+  // ROS Services Callbacks
+  bool disableCollisionSrvCb(std_srvs::TriggerRequest &req, std_srvs::TriggerResponse &res);
+  bool addCollisionObjectSrvCb(std_srvs::TriggerRequest &req, std_srvs::TriggerResponse &res);
+  bool startPositionCtlCb(std_srvs::TriggerRequest &req, std_srvs::TriggerResponse &res);
+  bool startJointTrajCtlCb(std_srvs::TriggerRequest &req, std_srvs::TriggerResponse &res);
+  bool startJointGroupPositionCtlCb(std_srvs::TriggerRequest &req, std_srvs::TriggerResponse &res);
+  bool startJointGroupVelocityCtlCb(std_srvs::TriggerRequest &req, std_srvs::TriggerResponse &res);
+  bool getIkSrvCb(uam_ros_ctl::getIkRequest &req, uam_ros_ctl::getIkResponse &res); 
+  bool setStateCb(uam_ros_ctl::changeStateRequest &req, uam_ros_ctl::changeStateResponse &res);
 
-  // DisplayTrajectory
-  moveit_msgs::DisplayTrajectory displayTrajectory_;
+
+  // methods
+  bool sendToCmdPose();
+  bool sendToCartesianCmdPose(); 
+  bool sendToCmdPoses(std::vector<geometry_msgs::Pose> poses);
+  bool sendToDeltaCmdPose();
+  bool sendToServoCmdPose(); 
+  void addCollisionObject(moveit_msgs::PlanningScene &planningScene);
+  void getArmState();
+  void getEEState(const std::string eeLinkName);
+  void getJointPositions(const std::vector<std::string> &jointNames, std::vector<double> &jointGroupPositions);
+  void getRunningControllers(std::vector<std::string> &runningControllerNames);
+  bool getIK(const geometry_msgs::Pose wantedPose, const std::size_t attempts, double timeout);
+  bool getAnalyticIK(const geometry_msgs::Pose wantedPose); 
+
+  geometry_msgs::Pose getCurrentEEPose();
+  Eigen::MatrixXd getJacobian(Eigen::Vector3d refPointPosition); // Can be created as void and arg passed to be changed during execution
+  std::vector<geometry_msgs::Pose> createCartesianWaypoints(geometry_msgs::Pose startPose, geometry_msgs::Pose endPose, int numPoints);
+  Eigen::MatrixXd getInertiaMatrix(Eigen::Vector3d refPointPosition);
+
+  // TODO: Move this to utils.cpp
+  float round(float var);
+
+  // Simple state machine
+  enum state 
+  {   
+      IDLE = 0,
+      JOINT_TRAJ_CTL = 1,
+      CART_TRAJ_CTL = 2,  
+      SERVO_CTL = 3
+  };
+
+  // stateNames 
+  const char* stateNames[4] =
+  {
+    stringify (IDLE), 
+    stringify (JOINT_TRAJ_CTL), 
+    stringify (CART_TRAJ_CTL),
+    stringify (SERVO_CTL)
+  };
+
+  enum state robotState = IDLE; 
+
+    // DisplayTrajectory
+  moveit_msgs::DisplayTrajectory displayTraj;
 
   // Private variables
+  // It is not neccessary to have distinciton between private and public variable naming for now
   int sleepMs_;
-  bool realRobot_;
   bool enableVisualization_;
-  bool moveGroupInitialized_;
-  bool planningSceneInitialized_;
+  bool recivPoseCmd = false; 
+  bool moveGroupInit = false;
+  bool planSceneInit = false;
+  bool planSceneMonitorInit = false; 
   bool blockingMovement = true;
   std::string endEffectorLinkName;
   geometry_msgs::Pose m_cmdPose;
@@ -167,29 +250,29 @@ private:
 
   // Vectors and arrays
   std::vector<double> m_jointPositions_;
-
-  bool sendToCmdPose();
-  void sendToCmdPoses(std::vector<geometry_msgs::Pose> poses);
-  bool sendToDeltaCmdPose();
-  void addCollisionObject(moveit_msgs::PlanningScene &planningScene);
-  void getCurrentArmState();
-  void getCurrentEndEffectorState(const std::string linkName);
-  void getJointPositions(const std::vector<std::string> &jointNames,
-                         std::vector<double> &jointGroupPositions);
-  void getRunningControllers(std::vector<std::string> &runningControllerNames);
-  bool getIK(const geometry_msgs::Pose wantedPose, const std::size_t attempts, double timeout);
-  Eigen::MatrixXd getJacobian(Eigen::Vector3d
-                  refPointPosition); // Can be created as void and arg passed to
-                                     // be changed during execution
-  Eigen::MatrixXd getInertiaMatrix(Eigen::Vector3d refPointPosition);
-
-  // TODO: Move this to utils.cpp
-  float round(float var);
-
-  // Have to rebuild each time when this is changes, TODO: Add some config for that
-  static constexpr auto GROUP_NAME = "arm"; 
-  static constexpr auto EE_LINK_NAME = "end_effector_base"; 
-
 };
 
-#endif // CONTROL_ARM_H
+class StatusMonitor
+{
+public:
+  StatusMonitor(ros::NodeHandle& nh, const std::string& topic)
+  {
+    sub_ = nh.subscribe(topic, 1, &StatusMonitor::statusCB, this);
+  }
+
+private:
+  void statusCB(const std_msgs::Int8ConstPtr& msg)
+  {
+    moveit_servo::StatusCode latest_status = static_cast<moveit_servo::StatusCode>(msg->data);
+    if (latest_status != status_)
+    {
+      status_ = latest_status;
+      const auto& status_str = moveit_servo::SERVO_STATUS_CODE_MAP.at(status_);
+      ROS_INFO_STREAM_NAMED("arm_ctl", "Servo status: " << status_str);
+    }
+  }
+  moveit_servo::StatusCode status_ = moveit_servo::StatusCode::INVALID;
+  ros::Subscriber sub_;
+};
+
+#endif // UAM_ARM_CTL_HPP
