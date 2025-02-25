@@ -27,7 +27,7 @@ bool UamRosCtl::initPublishers()
 bool UamRosCtl::initSubscribers()
 {
     ROS_INFO_NAMED("uam_ros_ctl", "Initializing Subscribers!");
-    //m_subTargetPose = nodeHandle_.subscribe("target_pose", 1, &UamRosCtl::targetPoseCallback, this);
+    m_subTargetPose = nodeHandle_.subscribe("target_pose", 1, &UamRosCtl::targetPoseCallback, this);
     // TODO: Initialize subscribers
     return true;
 }
@@ -46,6 +46,11 @@ bool UamRosCtl::setMoveGroup()
     m_currentRobotStatePtr = m_moveGroupPtr->getCurrentState();
 
     return true; 
+}
+
+void UamRosCtl::targetPoseCallback(const geometry_msgs::Pose::ConstPtr& msg)
+{
+    std::cout << "cool!" << std::endl; 
 }
 
 void UamRosCtl::run() {

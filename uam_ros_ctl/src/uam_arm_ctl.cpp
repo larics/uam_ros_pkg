@@ -1,22 +1,21 @@
 #include "uam_arm_ctl.hpp"
 
-ControlArm::ControlArm(ros::NodeHandle nh) : nodeHandle_(nh) {
+ControlArm::ControlArm(ros::NodeHandle nh) : nH(nh) {
 
-  ROS_INFO("[ControlArm] Node started.");
+  ROS_INFO_NAMED("arm_ctl",  "Node started.");
 
-  // Read parameters from config file.
-  if (!readParameters()) {
-    ros::requestShutdown();
-  }
+  enableVisualization_ = true; 
+  sleepMs_ = 2000000; 
 
-  // Initial sleep (waiting for move group and rest of the MoveIt stuff to
+  // Initial sleep (waiting for move group and rest of the MoveIt stuff to --> Maybe there's smarter way to wait for move group?
   // initialize.)
+  usleep(sleepMs_);
 
-  usleep(sleepMs_); 
-  // TODO: Add waiting for the MoveIt!
+  // Load group and topic names
+  loadConfig(); 
 
-  // Initialize class
-  init();
+  // Initialize robot ctl class
+  initRobot();
 
   // Find out basic info
   getBasicInfo();
@@ -24,120 +23,88 @@ ControlArm::ControlArm(ros::NodeHandle nh) : nodeHandle_(nh) {
 
 ControlArm::~ControlArm() {}
 
-bool ControlArm::readParameters() {
-  // Load common parameters
-  nodeHandle_.param("visualization/enable_viz", enableVisualization_, true);
-  nodeHandle_.param("init/sleep_time", sleepMs_, 20000000);
-  ROS_INFO_STREAM("Reading parameters!"); 
+void ControlArm::initRobot() {
 
-  return true;
-}
+  ROS_INFO("[ControlArm] Started node initialization.");
 
-void ControlArm::init() {
+  // Set move group and planning scene
+  moveGroupInit         = setMoveGroup();
+  planSceneInit         = setPlanningScene();
+  ROS_INFO_NAMED("arm_ctl", "Initialized: move_group, planning_scene, planning_scene_monitor."); 
 
-  ROS_INFO_STREAM("[ControlArm] Started node initialization.");
+  dispTrajPub               = nH.advertise<moveit_msgs::DisplayTrajectory>(dispTrajTopicName, dispTrajQSize);
+  currPosePub               = nH.advertise<geometry_msgs::Pose>(currPoseTopicName, currPoseQSize);
+  cmdJointGroupPositionPub  = nHns.advertise<std_msgs::Float64MultiArray>(std::string("franka_ph/joint_group_position_controller/command"), 1);
+  cmdJointGroupVelocityPub  = nHns.advertise<std_msgs::Float64MultiArray>(std::string("franka_ph/joint_group_velocity_controller/command"), 1);
 
-  // Set main move group
-  moveGroupInitialized_ = setMoveGroup();
-
-  planningSceneInitialized_ = setPlanningScene();
-
-  // Choose default planner
-  m_moveGroupPtr->setPlannerId("RRT");
-
-  // Initialize publishers and subscribers;
-  std::string displayTrajectoryTopicName = "move_group/display_planned_path";
-  int displayTrajectoryQueueSize = 1; 
-  std::string currentPoseTopicName = "tool/current_pose";
-  int currentPoseTopicQueueSize = 1; 
-  std::string cmdPoseTopicName = "arm/command_pose"; 
-  int cmdPoseTopicQueueSize = 1; 
-  std::string cmdToolOrientationTopicName = "tool/command/orientation"; 
-  int cmdToolOrientationTopicQueueSize = 1; 
-  std::string cmdDeltaPoseTopicName = "arm/command/delta_pose";
-  int cmdDeltaPoseTopicQueueSize = 1; 
-  int currentJointCmdQueueSize = 1; 
-
-  std::string disableCollisionServiceName = "tool/disable_collision";
-  std::string addCollisionObjectServiceName = "scene/add_collisions"; 
-  std::string startPositionControllersServiceName = "controllers/start_position_controllers"; 
-  std::string startJointTrajectoryControllerServiceName = "controllers/start_joint_trajectory_controller";
-  std::string startJointGroupPositionControllerServiceName = "controllers/start_joint_group_position_controller";
-  std::string startJointGroupVelocityControllerServiceName = "controllers/start_joint_group_velocity_controller"; 
-
-
-  ROS_INFO("[ControlArm] Initializing subscribers/publishers...");
-  displayTrajectoryPublisher_ =
-      nodeHandle_.advertise<moveit_msgs::DisplayTrajectory>(
-          displayTrajectoryTopicName, displayTrajectoryQueueSize);
-  currentPosePublisher_ = nodeHandle_.advertise<geometry_msgs::Pose>(
-      currentPoseTopicName, currentPoseTopicQueueSize);
- 
-  cmdJoint1Publisher = nodeHandleWithoutNs_.advertise<std_msgs::Float64>(
-      std::string("franka_ph/joint_1_position_controller/command"), 1);
-  cmdJointGroupPositionPublisher =
-      nodeHandleWithoutNs_.advertise<std_msgs::Float64MultiArray>(
-          std::string("franka_ph/joint_group_position_controller/command"), 1);
-  cmdJointGroupVelocityPublisher =
-      nodeHandleWithoutNs_.advertise<std_msgs::Float64MultiArray>(
-          std::string("franka_ph/joint_group_velocity_controller/command"), 1);
-
-  armCmdPoseSubscriber_ = nodeHandle_.subscribe<geometry_msgs::Pose>(
-      cmdPoseTopicName, cmdPoseTopicQueueSize, &ControlArm::cmdPoseCallback,
-      this);
-  armCmdToolOrientationSubscriber_ =
-      nodeHandle_.subscribe<geometry_msgs::Point>(
-          cmdToolOrientationTopicName, cmdToolOrientationTopicQueueSize,
-          &ControlArm::cmdToolOrientationCallback, this);
-  armCmdDeltaPoseSubscriber_ = nodeHandle_.subscribe<geometry_msgs::Pose>(
-      cmdDeltaPoseTopicName, cmdDeltaPoseTopicQueueSize,
-      &ControlArm::cmdDeltaPoseCallback, this);
-  ROS_INFO("[ControlArm] Initialized subscribers/publishers.");
+  // Subscribers
+  cmdPoseSub                = nH.subscribe<geometry_msgs::Pose>(cmdPoseTopicName, cmdPoseQSize, &ControlArm::cmdPoseCb, this);
+  cmdToolOrientSub          = nH.subscribe<geometry_msgs::Point>(cmdToolOrientTopicName, cmdToolOrientQSize, &ControlArm::cmdToolOrientationCb, this);
+  cmdDeltaPoseSub           = nH.subscribe<geometry_msgs::Pose>(cmdDeltaPoseTopicName, cmdDeltaPoseQSize, &ControlArm::cmdDeltaPoseCb, this);
+  ROS_INFO_NAMED("arm_ctl", "Initialized subscribers/publishers.");
 
   // Initialize Services
-  ROS_INFO("[ControlArm] Initializing services...");
-  disableCollisionService_ = nodeHandle_.advertiseService(
-      disableCollisionServiceName, &ControlArm::disableCollisionServiceCallback,
-      this);
-  addCollisionObjectService_ = nodeHandle_.advertiseService(
-      addCollisionObjectServiceName,
-      &ControlArm::addCollisionObjectServiceCallback, this);
-  startPositionControllersService_ = nodeHandle_.advertiseService(
-      startPositionControllersServiceName,
-      &ControlArm::startPositionControllers, this);
-  startJointTrajectoryControllerService_ = nodeHandle_.advertiseService(
-      startJointTrajectoryControllerServiceName,
-      &ControlArm::startJointTrajectoryController, this);
-  startJointGroupPositionControllerService_ = nodeHandle_.advertiseService(
-      startJointGroupPositionControllerServiceName,
-      &ControlArm::startJointGroupPositionController, this);
-  startJointGroupVelocityControllerService_ = nodeHandle_.advertiseService(
-      startJointGroupVelocityControllerServiceName,
-      &ControlArm::startJointGroupVelocityController, this);
-  ROS_INFO("[ControlArm] Initialized services.");
+  getIkSrv                      = nH.advertiseService(getIkSrvName, &ControlArm::getIkSrvCb, this);
+  disableCollisionSrv           = nH.advertiseService(disableCollisionSrvName, &ControlArm::disableCollisionSrvCb, this);
+  addCollisionObjectSrv         = nH.advertiseService(addCollisionObjectSrvName, &ControlArm::addCollisionObjectSrvCb, this);
+  startPositionCtlSrv           = nH.advertiseService(startPositionCtlSrvName, &ControlArm::startPositionCtlCb, this);
+  startJointTrajCtlSrv          = nH.advertiseService(startJointTrajCtlSrvName, &ControlArm::startJointTrajCtlCb, this);
+  startJointGroupPositionCtlSrv = nH.advertiseService(startJointGroupPosCtlSrvName, &ControlArm::startJointGroupPositionCtlCb, this);
+  startJointGroupVelocityCtlSrv = nH.advertiseService(startJointGroupVelCtlSrvName, &ControlArm::startJointGroupVelocityCtlCb, this);
+  changeRobotStateSrv           = nH.advertiseService(changeRobotStateSrvName, &ControlArm::setStateCb, this); 
+  ROS_INFO_NAMED("arm_ctl", "Initialized services.");
 
   // Initialize Clients for other services
-  ROS_INFO("[ControlArm] Initializing service clients...");
-  applyPlanningSceneServiceClient_ =
-      nodeHandleWithoutNs_.serviceClient<moveit_msgs::ApplyPlanningScene>(
-          "apply_planning_scene");
-  applyPlanningSceneServiceClient_.waitForExistence();
-  
-  ROS_INFO("[ControlArm] Initialized service clients. ");
+  applyPlanningSceneSrvCli = nHns.serviceClient<moveit_msgs::ApplyPlanningScene>("apply_planning_scene");
+  applyPlanningSceneSrvCli.waitForExistence();
+  ROS_INFO_NAMED("arm_ctl", "Initialized service clients. ");
+}
+
+void ControlArm::loadConfig() {
+
+  // TODO: Add argument that's propagated through launch file
+  YAML::Node config = YAML::LoadFile("/root/uav_ws/src/uam_ros_pkg/uam_ros_ctl/config/aerial_manipulator.yaml");
+
+  // Set move group name and ee link
+  GROUP_NAME = config["robot"]["arm_name"].as<std::string>(); //"panda_manipulator"; 
+  EE_LINK_NAME = config["robot"]["ee_link_name"].as<std::string>(); //"panda_hand_tcp"; 
+  NUM_CART_PTS = config["robot"]["num_cart_pts"].as<int>(); 
+
+  // Topic names
+  dispTrajTopicName     = config["topic"]["pub"]["display_trajectory"]["name"].as<std::string>(); 
+  currPoseTopicName     = config["topic"]["pub"]["current_pose"]["name"].as<std::string>(); 
+  cmdPoseTopicName      = config["topic"]["sub"]["cmd_pose"]["name"].as<std::string>(); 
+  cmdDeltaPoseTopicName = config["topic"]["sub"]["cmd_delta_pose"]["name"].as<std::string>(); 
+
+  // Q Sizes
+  dispTrajQSize     = config["topic"]["pub"]["display_trajectory"]["queue"].as<int>(); 
+  currPoseQSize     = config["topic"]["pub"]["current_pose"]["queue"].as<int>(); 
+  cmdPoseQSize      = config["topic"]["sub"]["cmd_pose"]["queue"].as<int>(); 
+  cmdDeltaPoseQSize = config["topic"]["sub"]["cmd_delta_pose"]["queue"].as<int>(); 
+  ROS_INFO_NAMED("arm_ctl", "setted queue sizes!");
+
+  // Srv names 
+  disableCollisionSrvName           = config["srv"]["disable_collision"]["name"].as<std::string>(); 
+  addCollisionObjectSrvName         = config["srv"]["add_collision"]["name"].as<std::string>(); 
+  startPositionCtlSrvName           = config["srv"]["start_position_ctl"]["name"].as<std::string>(); 
+  startJointTrajCtlSrvName          = config["srv"]["start_joint_traj_ctl"]["name"].as<std::string>(); 
+  startJointGroupPosCtlSrvName      = config["srv"]["start_joint_group_pos_ctl"]["name"].as<std::string>(); 
+  startJointGroupVelCtlSrvName      = config["srv"]["start_joint_group_vel_ctl"]["name"].as<std::string>(); 
+  changeRobotStateSrvName           = config["srv"]["change_robot_state"]["name"].as<std::string>(); 
+  ROS_INFO_NAMED("arm_ctl", "named services"); 
 }
 
 bool ControlArm::setMoveGroup() {
 
-  ROS_INFO("[ControlArm] Setting move group.");
+  ROS_INFO_NAMED("arm_ctl",  "Setting move group.");
 
-  m_moveGroupPtr =
-      new moveit::planning_interface::MoveGroupInterface(GROUP_NAME);
+  m_moveGroupPtr = new moveit::planning_interface::MoveGroupInterface(GROUP_NAME);
 
   // Allow replanning
   m_moveGroupPtr->allowReplanning(true);
 
   // Get current robot arm state
-  getCurrentArmState();
+  getArmState();
 
   return true;
 }
@@ -145,7 +112,6 @@ bool ControlArm::setMoveGroup() {
 bool ControlArm::setPlanningScene() {
 
   ROS_INFO("[ControlArm] Setting planning scene.");
-
   // MoveIt planning scene setup as seen
   // (http://docs.ros.org/en/melodic/api/moveit_tutorials/html/doc/planning_scene/planning_scene_tutorial.html)
   robot_model_loader::RobotModelLoader m_robotLoader("robot_description");
@@ -156,21 +122,10 @@ bool ControlArm::setPlanningScene() {
   return true;
 }
 
-// This is wrong, we should pass cmdPose as argument into function and then set
-// it if we plan to use setters
-bool ControlArm::setCmdPose() {
-
-  if (moveGroupInitialized_) {
-
-    m_moveGroupPtr->setPoseTarget(m_cmdPose);
-    return true;
-  }
-  return false;
-}
 
 void ControlArm::getBasicInfo() {
 
-  if (moveGroupInitialized_) {
+  if (moveGroupInit) {
 
     ROS_INFO("[ControlArm] Reference planning frame: %s",
              m_moveGroupPtr->getPlanningFrame().c_str());
@@ -178,8 +133,103 @@ void ControlArm::getBasicInfo() {
              m_moveGroupPtr->getEndEffectorLink().c_str());
   }
 }
+// This is wrong, we should pass cmdPose as argument into function and then set
+// it if we plan to use setters
+bool ControlArm::setCmdPose() {
 
-void ControlArm::cmdPoseCallback(const geometry_msgs::Pose::ConstPtr &msg) {
+  if (moveGroupInit) {
+    m_moveGroupPtr->setPoseTarget(m_cmdPose);
+    return true;
+  }
+  return false;
+}
+
+bool ControlArm::setStateCb(uam_ros_ctl::changeStateRequest &req, uam_ros_ctl::changeStateResponse &res)
+{
+
+    // Why would this be boolean? 
+
+    auto itr = std::find(std::begin(stateNames), std::end(stateNames), req.state);
+    
+
+    if ( itr != std::end(stateNames))
+    {
+        int iX = std::distance(stateNames, itr); 
+        robotState  = (state)iX; 
+        ROS_INFO_STREAM("Switching state!");
+        res.success = true;  
+    }else{
+        ROS_INFO_STREAM("Failed switching to state " << req.state); 
+        res.success = false; 
+    } 
+
+    return res.success; 
+
+}
+
+void ControlArm::getArmState() {
+
+  // method is more like refresh current kinematic state
+  // (getCurrentKinematicState)
+  m_currentRobotStatePtr = m_moveGroupPtr->getCurrentState();
+}
+
+void ControlArm::getEEState(const std::string eeLinkName) {
+
+  m_endEffectorState =
+      m_currentRobotStatePtr->getGlobalLinkTransform(eeLinkName);
+
+  bool debug = false;
+  if (debug) {
+
+    ROS_INFO_STREAM("Translation: \n"
+                    << m_endEffectorState.translation() << "\n");
+    ROS_INFO_STREAM("Rotation: \n" << m_endEffectorState.rotation() << "\n");
+  }
+}
+
+void ControlArm::getJointPositions(const std::vector<std::string> &jointNames, std::vector<double> &jointGroupPositions) {
+
+  m_currentRobotStatePtr->copyJointGroupPositions(m_jointModelGroupPtr,
+                                                  jointGroupPositions);
+
+  bool debug = true;
+  if (debug) {
+    for (std::size_t i = 0; i < jointNames.size(); ++i) {
+      ROS_INFO("Joint %s: %f", jointNames[i].c_str(), jointGroupPositions[i]);
+    }
+  }
+}
+
+bool ControlArm::getIK(const geometry_msgs::Pose wantedPose, const std::size_t attempts, double timeout) {
+
+  bool found_ik = m_currentRobotStatePtr->setFromIK(m_jointModelGroupPtr, wantedPose);
+
+  bool debug = false;
+  if (debug) {
+    ROS_INFO("Found IK solution!");
+  }
+
+  return found_ik;
+}
+
+bool ControlArm::getIkSrvCb(uam_ros_ctl::getIkRequest &req, uam_ros_ctl::getIkResponse &res)
+{
+    int attempts = 10;
+    int timeout = 1;
+    bool success = getIK(req.wantedPose, attempts, timeout);
+    std::vector<double> jointPositions;
+    m_currentRobotStatePtr->copyJointGroupPositions(m_jointModelGroupPtr,
+                                                    jointPositions);
+
+    sensor_msgs::JointState jointState;
+    jointState.position = jointPositions;
+    res.jointState = jointState;
+
+    return success;
+}
+
+void ControlArm::cmdPoseCb(const geometry_msgs::Pose::ConstPtr &msg) {
 
   ROS_INFO("[ControlArm] Recieved cmd_pose...");
 
@@ -187,11 +237,11 @@ void ControlArm::cmdPoseCallback(const geometry_msgs::Pose::ConstPtr &msg) {
   m_cmdPose.position = msg->position;
   m_cmdPose.orientation = msg->orientation;
 
-  sendToCmdPose();
+  recivPoseCmd = true; 
+  
 }
 
-void ControlArm::cmdDeltaPoseCallback(
-    const geometry_msgs::Pose::ConstPtr &msg) {
+void ControlArm::cmdDeltaPoseCb(const geometry_msgs::Pose::ConstPtr &msg) {
 
   ROS_INFO("[ControlArm] Recieved cmd_delta_pose...");
 
@@ -202,13 +252,12 @@ void ControlArm::cmdDeltaPoseCallback(
   sendToDeltaCmdPose();
 }
 
-void ControlArm::cmdToolOrientationCallback(
-    const geometry_msgs::Point::ConstPtr &msg) {
+void ControlArm::cmdToolOrientationCb(const geometry_msgs::Point::ConstPtr &msg) {
 
   ROS_INFO("[ControlArm] Received cmd tool orientation...");
 
   // Get current end effector state
-  getCurrentEndEffectorState(endEffectorLinkName);
+  getEEState(EE_LINK_NAME);
 
   geometry_msgs::Pose cmdPose;
   tf2::Quaternion cmdQuaternion;
@@ -233,20 +282,17 @@ void ControlArm::cmdToolOrientationCallback(
 
 bool ControlArm::sendToCmdPose() {
 
-  // Set CmdPose to moveit interface class - PROLAZI
-  bool successCmdPose = setCmdPose();
-  ROS_INFO("[ControlArm] Set CmdPose: %s",
-           successCmdPose ? "SUCCESS" : "FAILED");
+  setCmdPose();
 
   // Call planner, compute plan and visualize it
   moveit::planning_interface::MoveGroupInterface::Plan plannedPath;
 
-  // plan Path
+  // plan Path --> normal path
   bool success = (m_moveGroupPtr->plan(plannedPath) ==
                   moveit::planning_interface::MoveItErrorCode::SUCCESS);
 
   ROS_INFO("[ControlArm] Visualizing plan 1 (pose goal) %s",
-           success ? "SUCCESS" : "FAILED");
+           success ? "" : "FAILED");
 
   // Requires async spinner to work (Added asyncMove/non-blocking)
   if (success) {
@@ -260,42 +306,62 @@ bool ControlArm::sendToCmdPose() {
   return success;
 }
 
-void ControlArm::sendToCmdPoses(std::vector<geometry_msgs::Pose> poses) {
+bool ControlArm::sendToCartesianCmdPose() {
+
+  // get current ee pose
+  geometry_msgs::Pose currPose = getCurrentEEPose(); 
+  // set cmd pose
+  setCmdPose(); 
+
+  moveit::planning_interface::MoveGroupInterface::Plan plannedPath; 
+  std::vector<geometry_msgs::Pose> cartesianWaypoints = createCartesianWaypoints(currPose, m_cmdPose, NUM_CART_PTS); 
+
+  // TODO: create Cartesian plan, use as first point currentPose 4 now, and 
+  // as end point use targetPoint
+  moveit_msgs::RobotTrajectory trajectory;
+  moveit_msgs::MoveItErrorCodes errorCode; 
+  // TODO: Set as params that can be configured in YAML!
+  double jumpThr = 0.0; 
+  double eefStep = 0.02; 
+  // plan Cartesian path
+  m_moveGroupPtr->computeCartesianPath(cartesianWaypoints, eefStep, jumpThr, trajectory, true, &errorCode);
+  //plannedPath.start_state_ = getEEState()
+  //std::cout << "MoveIt! errorCode:" << errorCode;
+  if (errorCode.val != 1){
+    ROS_WARN_ONCE("Planning Cartesian path failed!"); 
+  } 
+  else{
+    std::cout << "Trajectory!" << trajectory; 
+    plannedPath.trajectory_ = trajectory;
+    m_moveGroupPtr->asyncExecute(plannedPath);
+  }
+  return true; 
+}
+
+bool ControlArm::sendToCmdPoses(std::vector<geometry_msgs::Pose> poses) {
   for (int i; i < poses.size(); ++i) {
     ROS_INFO_STREAM("[ControlArmNode] Visiting pose " << i);
     m_cmdPose.position = poses.at(i).position;
     m_cmdPose.orientation = poses.at(i).orientation;
     sendToCmdPose();
-    // if (m_moveGroupPtr->state)
   }
+  return true; 
 }
 
 bool ControlArm::sendToDeltaCmdPose() {
 
-  // populate m_cmd pose
-  Eigen::Affine3d currentPose_ =
-      m_moveGroupPtr->getCurrentState()->getFrameTransform(
-          EE_LINK_NAME); // Currently lwa4p_link6, possible to use end effector
-                          // link
-  geometry_msgs::Pose currentROSPose_;
-  tf::poseEigenToMsg(currentPose_, currentROSPose_);
+  geometry_msgs::Pose currPose = getCurrentEEPose(); 
 
-  ROS_INFO_STREAM("[ControlArm] currentROSPose_:" << currentROSPose_);
-
+  ROS_INFO_STREAM("[ControlArm] current EE Pose:" << currPose);
   geometry_msgs::Pose cmdPose;
-  cmdPose.position.x = currentROSPose_.position.x + m_cmdDeltaPose.position.x;
-  cmdPose.position.y = currentROSPose_.position.y + m_cmdDeltaPose.position.y;
-  cmdPose.position.z = currentROSPose_.position.z + m_cmdDeltaPose.position.z;
-  cmdPose.orientation.x =
-      currentROSPose_.orientation.x + m_cmdDeltaPose.orientation.x;
-  cmdPose.orientation.y =
-      currentROSPose_.orientation.y + m_cmdDeltaPose.orientation.y;
-  cmdPose.orientation.z =
-      currentROSPose_.orientation.z + m_cmdDeltaPose.orientation.z;
-  cmdPose.orientation.w =
-      currentROSPose_.orientation.w + m_cmdDeltaPose.orientation.w;
-
-  ROS_INFO_STREAM("[ControlArm] currentPose: " << cmdPose);
+  cmdPose.position.x = currPose.position.x + m_cmdDeltaPose.position.x;
+  cmdPose.position.y = currPose.position.y + m_cmdDeltaPose.position.y;
+  cmdPose.position.z = currPose.position.z + m_cmdDeltaPose.position.z;
+  cmdPose.orientation.x = currPose.orientation.x + m_cmdDeltaPose.orientation.x;
+  cmdPose.orientation.y = currPose.orientation.y + m_cmdDeltaPose.orientation.y;
+  cmdPose.orientation.z = currPose.orientation.z + m_cmdDeltaPose.orientation.z;
+  cmdPose.orientation.w = currPose.orientation.w + m_cmdDeltaPose.orientation.w;
+  ROS_INFO_STREAM("[ControlArm] cmd EE Pose: " << cmdPose);
 
   // set CMD pose
   m_cmdPose = cmdPose;
@@ -303,6 +369,27 @@ bool ControlArm::sendToDeltaCmdPose() {
   sendToCmdPose();
 
   return true;
+}
+
+geometry_msgs::Pose ControlArm::getCurrentEEPose() {
+  
+  // populate m_cmd pose --> TODO: Create separate method for this
+  Eigen::Affine3d currPose = m_moveGroupPtr->getCurrentState()->getFrameTransform(EE_LINK_NAME); 
+  geometry_msgs::Pose currROSPose;
+  tf::poseEigenToMsg(currPose, currROSPose);
+
+  return currROSPose;
+
+}
+
+bool ControlArm::sendToServoCmdPose(){
+
+  ROS_INFO_STREAM("Activating MoveIt Servo!"); 
+
+
+
+  return true; 
+
 }
 
 void ControlArm::addCollisionObject(moveit_msgs::PlanningScene &planningScene) {
@@ -344,12 +431,11 @@ void ControlArm::addCollisionObject(moveit_msgs::PlanningScene &planningScene) {
   ROS_INFO("Added collisions");
 }
 
-bool ControlArm::disableCollisionServiceCallback(
-    std_srvs::TriggerRequest &req, std_srvs::TriggerResponse &res) {
+bool ControlArm::disableCollisionSrvCb(std_srvs::TriggerRequest &req, std_srvs::TriggerResponse &res) 
+{
   // TODO: Move this to specific script because it's related to magnetic
-  // localization
-
-  if (planningSceneInitialized_) {
+  // localization -> or grasping
+  if (planSceneInit) {
     collision_detection::AllowedCollisionMatrix acm =
         m_planningScenePtr->getAllowedCollisionMatrix();
 
@@ -366,7 +452,7 @@ bool ControlArm::disableCollisionServiceCallback(
 
     moveit_msgs::ApplyPlanningScene srv;
     srv.request.scene = planningScene;
-    applyPlanningSceneServiceClient_.call(srv);
+    applyPlanningSceneSrvCli.call(srv);
 
     bool debugOut = false;
     if (debugOut) {
@@ -383,18 +469,18 @@ bool ControlArm::disableCollisionServiceCallback(
   }
 }
 
-void ControlArm::getRunningControllers(
-    std::vector<std::string> &runningControllerNames) {
+void ControlArm::getRunningControllers(std::vector<std::string> &runningControllerNames) {
   ROS_INFO("[ControlArm] Listing controllers: ");
   controller_manager_msgs::ListControllersRequest listReq;
   controller_manager_msgs::ListControllersResponse listRes;
-  listControllersServiceClient_.call(listReq, listRes);
+  listCtlSrvCli.call(listReq, listRes);
   // ROS_INFO_STREAM("[ControlArm] Controllers: " << listRes);
 
   for (std::size_t i = 0; i < listRes.controller.size(); ++i) {
     if (listRes.controller[i].state == "running") {
       // Additional constraints for controllers that must be active all of the
       // time
+      // TODO: Add excluded controller list
       if (listRes.controller[i].name != "joint_state_controller" &&
           listRes.controller[i].name != "distancer_right_position_controller" &&
           listRes.controller[i].name != "distancer_left_position_controller") {
@@ -410,96 +496,7 @@ void ControlArm::getRunningControllers(
   // runningControllerNames);
 }
 
-bool ControlArm::startJointTrajectoryController(
-    std_srvs::TriggerRequest &req, std_srvs::TriggerResponse &res) {
-
-  std::vector<std::string> runningControllers;
-  getRunningControllers(runningControllers);
-
-  ROS_INFO("[ControlArm] Starting JointTrajectoryController...");
-  
-  // Stop running controllers
-  controller_manager_msgs::SwitchControllerRequest switchControllerRequest;
-  controller_manager_msgs::SwitchControllerResponse switchControllerResponse;
-  for (std::size_t i = 0; i < runningControllers.size(); ++i) {
-    switchControllerRequest.stop_controllers.push_back(runningControllers[i]);
-  }
-  switchControllerRequest.start_controllers.push_back(
-      std::string("arm_controller"));
-  switchControllerRequest.start_asap = true;
-  // ontroller Manager: To switch controllers you need to specify a strictness
-  // level of
-  //  controller_manager_msgs::SwitchController::STRICT (2) or ::BEST_EFFORT
-  //  (1). Defaulting to ::BEST_EFFORT.
-  switchControllerRequest.strictness = 2;
-  switchControllerRequest.timeout = 10;
-
-  switchControllerServiceClient_.call(switchControllerRequest,
-                                      switchControllerResponse);
-
-  return switchControllerResponse.ok;
-}
-
-bool ControlArm::startJointGroupPositionController(
-    std_srvs::TriggerRequest &req, std_srvs::TriggerResponse &res) {
-
-  std::vector<std::string> runningControllers;
-  getRunningControllers(runningControllers);
-
-  ROS_INFO("[ControlArm] Starting JointGroupPositionController...");
-  controller_manager_msgs::SwitchControllerRequest switchControllerRequest;
-  controller_manager_msgs::SwitchControllerResponse switchControllerResponse;
-  // Stop running controllers
-  for (std::size_t i = 0; i < runningControllers.size(); ++i) {
-    switchControllerRequest.stop_controllers.push_back(runningControllers[i]);
-  }
-  switchControllerRequest.start_controllers.push_back(
-      std::string("joint_group_position_controller"));
-  switchControllerRequest.start_asap = true;
-  switchControllerRequest.strictness = 2;
-  switchControllerRequest.timeout = 10;
-
-  switchControllerServiceClient_.call(switchControllerRequest,
-                                      switchControllerResponse);
-  ros::Duration(0.5).sleep();
-  // TODO: Add enabling stuff for different controller type
-  ROS_INFO("Sending all joints to zero");
-
-  ros::Duration(0.5).sleep();
-  // TODO: Add method for sending current joint states
-
-  return switchControllerResponse.ok;
-}
-
-bool ControlArm::startJointGroupVelocityController(
-    std_srvs::TriggerRequest &req, std_srvs::TriggerResponse &res) {
-
-  std::vector<std::string> runningControllers;
-  getRunningControllers(runningControllers);
-
-  ROS_INFO("[ControlArm] Start JointGroupVelocityController...");
-  controller_manager_msgs::SwitchControllerRequest switchControllerRequest;
-  controller_manager_msgs::SwitchControllerResponse switchControllerResponse;
-  // Stop running controllers
-  for (std::size_t i = 0; i < runningControllers.size(); ++i) {
-    switchControllerRequest.stop_controllers.push_back(runningControllers[i]);
-  }
-  switchControllerRequest.start_controllers.push_back(
-      std::string("joint_group_velocity_controller"));
-  switchControllerRequest.start_asap = true;
-  switchControllerRequest.strictness = 2;
-  switchControllerRequest.timeout = 10;
-
-  switchControllerServiceClient_.call(switchControllerRequest,
-                                      switchControllerResponse);
-
-  ROS_INFO("Switched to velocity controller");
-
-  return switchControllerResponse.ok;
-}
-
-bool ControlArm::startPositionControllers(std_srvs::TriggerRequest &req,
-                                          std_srvs::TriggerResponse &res) {
+bool ControlArm::startPositionCtlCb(std_srvs::TriggerRequest &req, std_srvs::TriggerResponse &res) {
 
   std::vector<std::string> runningControllers;
   getRunningControllers(runningControllers);
@@ -519,14 +516,18 @@ bool ControlArm::startPositionControllers(std_srvs::TriggerRequest &req,
       std::string("joint_3_position_controller"));
   switchControllerRequest.start_controllers.push_back(
       std::string("joint_4_position_controller"));
+  switchControllerRequest.start_controllers.push_back(
+      std::string("joint_5_position_controller"));
+  switchControllerRequest.start_controllers.push_back(
+      std::string("joint_6_position_controller"));
+  switchControllerRequest.start_asap = true;
   // Controller Manager: To switch controllers you need to specify a strictness
   // level of controller_manager_msgs::SwitchController::STRICT (2) or
   // ::BEST_EFFORT (1). Defaulting to ::BEST_EFFORT.
   switchControllerRequest.strictness = 2;
   switchControllerRequest.timeout = 10;
 
-  switchControllerServiceClient_.call(switchControllerRequest,
-                                      switchControllerResponse);
+  switchCtlSrvCli.call(switchControllerRequest, switchControllerResponse);
   ros::Duration(0.1).sleep();
 
   // sendZeros("position");
@@ -534,77 +535,103 @@ bool ControlArm::startPositionControllers(std_srvs::TriggerRequest &req,
   return switchControllerResponse.ok;
 }
 
-bool ControlArm::addCollisionObjectServiceCallback(
-    std_srvs::TriggerRequest &req, std_srvs::TriggerResponse &res) {
+bool ControlArm::startJointTrajCtlCb(std_srvs::TriggerRequest &req, std_srvs::TriggerResponse &res) {
 
+  std::vector<std::string> runningControllers;
+  getRunningControllers(runningControllers);
+
+  ROS_INFO("[ControlArm] Starting JointTrajectoryController...");
+  
+  // Stop running controllers
+  controller_manager_msgs::SwitchControllerRequest switchControllerRequest;
+  controller_manager_msgs::SwitchControllerResponse switchControllerResponse;
+  for (std::size_t i = 0; i < runningControllers.size(); ++i) {
+    switchControllerRequest.stop_controllers.push_back(runningControllers[i]);
+  }
+  // NOTE: "arm_controller" is hardcoded!
+  switchControllerRequest.start_controllers.push_back(std::string("arm_controller"));
+  switchControllerRequest.start_asap = true;
+  switchControllerRequest.strictness = 2;
+  switchControllerRequest.timeout = 10;
+
+  switchCtlSrvCli.call(switchControllerRequest, switchControllerResponse);
+
+  return switchControllerResponse.ok;
+}
+
+bool ControlArm::startJointGroupPositionCtlCb(std_srvs::TriggerRequest &req, std_srvs::TriggerResponse &res) {
+
+  std::vector<std::string> runningControllers;
+  getRunningControllers(runningControllers);
+
+  ROS_INFO("[ControlArm] Starting JointGroupPositionController...");
+  controller_manager_msgs::SwitchControllerRequest switchControllerRequest;
+  controller_manager_msgs::SwitchControllerResponse switchControllerResponse;
+  // Stop running controllers
+  for (std::size_t i = 0; i < runningControllers.size(); ++i) {
+    switchControllerRequest.stop_controllers.push_back(runningControllers[i]);
+  }
+  switchControllerRequest.start_controllers.push_back(std::string("joint_group_position_controller"));
+  switchControllerRequest.start_asap = true;
+  switchControllerRequest.strictness = 2;
+  switchControllerRequest.timeout = 10;
+
+  switchCtlSrvCli.call(switchControllerRequest, switchControllerResponse);
+  ros::Duration(0.5).sleep();
+  // TODO: Add enabling stuff for different controller type
+  ROS_INFO("Sending all joints to zero");
+
+  ros::Duration(0.5).sleep();
+  // TODO: Add method for sending current joint states
+
+  return switchControllerResponse.ok;
+}
+
+bool ControlArm::startJointGroupVelocityCtlCb(std_srvs::TriggerRequest &req, std_srvs::TriggerResponse &res) {
+
+  std::vector<std::string> runningControllers;
+  getRunningControllers(runningControllers);
+
+  ROS_INFO("[ControlArm] Start JointGroupVelocityController...");
+  controller_manager_msgs::SwitchControllerRequest switchControllerRequest;
+  controller_manager_msgs::SwitchControllerResponse switchControllerResponse;
+  // Stop running controllers
+  for (std::size_t i = 0; i < runningControllers.size(); ++i) {
+    switchControllerRequest.stop_controllers.push_back(runningControllers[i]);
+  }
+  switchControllerRequest.start_controllers.push_back(
+      std::string("joint_group_velocity_controller"));
+  switchControllerRequest.start_asap = true;
+  switchControllerRequest.strictness = 2;
+  switchControllerRequest.timeout = 10;
+
+  switchCtlSrvCli.call(switchControllerRequest, switchControllerResponse);
+
+  ROS_INFO("Switched to velocity controller");
+
+  return switchControllerResponse.ok;
+}
+
+bool ControlArm::addCollisionObjectSrvCb(std_srvs::TriggerRequest &req, std_srvs::TriggerResponse &res) {
   ROS_INFO("Entered collision object");
   // Initialize planning scene
   moveit_msgs::PlanningScene planningScene;
   m_planningScenePtr->getPlanningSceneMsg(planningScene);
   ROS_INFO("Got planning scene.");
   addCollisionObject(planningScene);
-
-  //
   moveit_msgs::ApplyPlanningScene srv;
   srv.request.scene = planningScene;
-  applyPlanningSceneServiceClient_.call(srv);
-
+  applyPlanningSceneSrvCli.call(srv);
   return true;
-
   // How to add this to planning scene moveit?
   // http://docs.ros.org/en/melodic/api/moveit_tutorials/html/doc/planning_scene_ros_api/planning_scene_ros_api_tutorial.html
 }
 
-void ControlArm::getCurrentArmState() {
-
-  // method is more like refresh current kinematic state
-  // (getCurrentKinematicState)
-
-  m_currentRobotStatePtr = m_moveGroupPtr->getCurrentState();
-}
-
-void ControlArm::getCurrentEndEffectorState(
-    const std::string endEffectorLinkName) {
-
-  m_endEffectorState =
-      m_currentRobotStatePtr->getGlobalLinkTransform(endEffectorLinkName);
-
-  bool debug = true;
-  if (debug) {
-
-    ROS_INFO_STREAM("Translation: \n"
-                    << m_endEffectorState.translation() << "\n");
-    ROS_INFO_STREAM("Rotation: \n" << m_endEffectorState.rotation() << "\n");
-  }
-}
-
-void ControlArm::getJointPositions(const std::vector<std::string> &jointNames,
-                                   std::vector<double> &jointGroupPositions) {
-
-  m_currentRobotStatePtr->copyJointGroupPositions(m_jointModelGroupPtr,
-                                                  jointGroupPositions);
-
-  bool debug = true;
-  if (debug) {
-    for (std::size_t i = 0; i < jointNames.size(); ++i) {
-      ROS_INFO("Joint %s: %f", jointNames[i].c_str(), jointGroupPositions[i]);
-    }
-  }
-}
-
-bool ControlArm::getIK(const geometry_msgs::Pose wantedPose, const std::size_t attempts, double timeout) {
-
-
-  bool found_ik = m_currentRobotStatePtr->setFromIK(m_jointModelGroupPtr, wantedPose);
-
-
-  bool debug = false;
-  if (debug) {
-    ROS_INFO("Found IK solution!");
-  }
-
-  return found_ik;
-}
+//bool ControlArm::getAnalyticIK(const geometry_msgs::Pose wantedPose)
+//{
+// TODO: Add analytic IK for Franka if exists
+//
+//}
 
 Eigen::MatrixXd ControlArm::getJacobian(Eigen::Vector3d refPointPosition) {
 
@@ -618,6 +645,39 @@ Eigen::MatrixXd ControlArm::getJacobian(Eigen::Vector3d refPointPosition) {
   return jacobianMatrix;
 }
 
+std::vector<geometry_msgs::Pose> ControlArm::createCartesianWaypoints(geometry_msgs::Pose startPose, geometry_msgs::Pose endPose, int numPoints) {
+    std::vector<geometry_msgs::Pose> result;
+    geometry_msgs::Pose pose_;
+    if (numPoints <= 1) {
+        result.push_back(startPose);
+        return result;
+    }
+    double stepX = (endPose.position.x - startPose.position.x) / (numPoints - 1);
+    double stepY = (endPose.position.y - startPose.position.y) / (numPoints - 1); 
+    double stepZ = (endPose.position.z - startPose.position.z) / (numPoints - 1); 
+    // Set i == 1 because start point doesn't have to be included into waypoint list 
+    // https://answers.ros.org/question/253004/moveit-problem-error-trajectory-message-contains-waypoints-that-are-not-strictly-increasing-in-time/
+    for (int i = 1; i < numPoints; ++i) {
+        pose_.position.x = startPose.position.x + i * stepX; 
+        pose_.position.y = startPose.position.y + i * stepY; 
+        pose_.position.z = startPose.position.z + i * stepZ; 
+        pose_.orientation.x = startPose.orientation.x; 
+        pose_.orientation.y = startPose.orientation.y;
+        pose_.orientation.z = startPose.orientation.z;
+        pose_.orientation.w = startPose.orientation.w; 
+        result.push_back(pose_);
+    }
+
+    // Print the values
+    std::cout << "Cartesian Waypoints values: ";
+    for (const auto& val : result) {
+        std::cout << val << " ";
+    }
+    std::cout << std::endl;
+
+    return result;
+}
+
 float ControlArm::round(float var) {
 
   float value = (int)(var * 1000 + .5);
@@ -627,33 +687,45 @@ float ControlArm::round(float var) {
 void ControlArm::run() {
 
   ros::Rate r(25);
-  m_moveGroupPtr->setPlanningTime(15.0);
-  //m_moveGroupPtr->setGoalOrientationTolerance(0.1);
-  //m_moveGroupPtr->setGoalPositionTolerance(0.1);
-  while (ros::ok) {
-
-    // Get current joint position for every joint in robot arm
-    getCurrentArmState();
-    
-
-    //actionlib::SimpleActionClient<moveit_msgs::MoveGroupAction_<std::allocator<void>>> action_client = m_moveGroupPtr->getMoveGroupClient();
-
-    // Get the action server name
   
-    //std::string action_server_name = action_client->getName();
-    //ROS_INFO("MoveGroup Action Server: %s", action_server_name.c_str());
+  while (ros::ok) {
+    // Get current joint position for every joint in robot arm
+    getArmState();
 
-    // Get all joints --> this one fails?!
+    // Get all joints
     m_jointModelGroupPtr = m_currentRobotStatePtr->getJointModelGroup(GROUP_NAME);
-
-    // EE_LINK_NAME=
     Eigen::Affine3d currentPose_ = m_moveGroupPtr->getCurrentState()->getFrameTransform(EE_LINK_NAME);
-    geometry_msgs::Pose currentROSPose_; 
-    tf::poseEigenToMsg(currentPose_, currentROSPose_);
-    currentPosePublisher_.publish(currentROSPose_);
+    geometry_msgs::Pose currentROSPose_; tf::poseEigenToMsg(currentPose_, currentROSPose_);
+    currPosePub.publish(currentROSPose_);
 
+    if (recivPoseCmd){
+
+      if(robotState == JOINT_TRAJ_CTL) 
+      {
+        sendToCmdPose(); 
+      }
+
+      if (robotState == CART_TRAJ_CTL)
+      {
+        sendToCartesianCmdPose();
+      }
+
+      if(robotState == IDLE)
+      {
+        ROS_WARN("Arm is in the IDLE mode, please activate correct control mode!"); 
+      }
+
+      recivPoseCmd = false; 
+
+    };
+
+    ROS_INFO_STREAM_THROTTLE(60, "Current arm state is: " << stateNames[robotState]); 
+    
     // Sleep
     r.sleep();
 
   }
 }
+
+
+// TOOD: Move to utils
