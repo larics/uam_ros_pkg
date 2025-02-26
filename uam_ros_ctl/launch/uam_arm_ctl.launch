@@ -3,6 +3,8 @@
     <!-- Arguments-->
     <arg name="config_path" value="$(find uam_ros_ctl)/config/topics.yaml"/>
     <param name="use_sim_time" value="true"/>
+
+    <node name="joint_state_filter" pkg="uam_ros_ctl" type="joint_states_filter.py" output="screen"/>
     
     <!-- Start Gazebo + MoveIt! -->
     <!--include file="$(find uam_moveit_config)/launch/demo_gazebo.launch"/-->
@@ -16,7 +18,5 @@
         <param name="config_path" value="$(arg config_path)" />
         <remap from="/joint_states" to="/arm_joint_states" />
     </node>
-
-    <node name="joint_state_filter" pkg="uam_moveit_config" type="joint_state_filter.py" output="screen"/>
 
 </launch>
