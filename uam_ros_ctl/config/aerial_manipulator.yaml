@@ -35,4 +35,4 @@ srv:
   start_joint_group_vel_ctl: 
     name: start_joint_group_vel_ctl
   change_robot_state: 
-    name: "change_state"
+    name: change_state
