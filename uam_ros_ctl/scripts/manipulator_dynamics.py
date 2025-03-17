@@ -22,6 +22,7 @@ class ArmDynamicsNode:
         l4 = 0.1
         self.l = [l1, l2, l3, l4]
         self.reciv_jnt = False
+        self.first_jnt = True
 
         self.tf_listener = tf.TransformListener()
 
@@ -36,14 +37,28 @@ class ArmDynamicsNode:
             return None, None
 
     def joint_state_callback(self, msg):
-        self.reciv_jnt = True
+
         """Callback function to update joint state values."""
         self.joint_positions = msg.position
         self.joint_velocities = msg.velocity
-        self.joint_accelerations = msg.accelerations
+        self.joint_accelerations = None
         self.q_p = np.array(self.joint_positions)
         self.q_v = np.array(self.joint_velocities)
+        if self.first_jnt:
+            self.prev_q_v = np.zeros(len(self.q_v))
+            self.jt = msg.header.stamp.to_sec()
+            self.first_jnt = False
+        else: 
+            jt_ = msg.header.stamp.to_sec()
+            dt = self.jt - jt_
+            self.q_a = self.calc_q_acc(self.prev_q_v, self.q_v, dt)
+            self.prev_q_v = self.q_v
+            self.jt = jt_
+
         # TODO: Add acceleration calculation
+        # self.q_a = np.array(calculate_accelerations())
+        self.reciv_jnt = True
+
     
     def forward_NE(self, dS, R):
         """Forward Newton-Euler calculations."""
@@ -75,12 +90,20 @@ class ArmDynamicsNode:
             p3, R3 = self.lookup_transform('link3', 'link2')
             p4, R4 = self.lookup_transform('link4', 'link3')
             p5, R5 = self.lookup_transform('link5', 'link4')
+            # Check if distances are consistent:
+            print(f"Distance: {np.round(p1, 3)}, {np.round(p2, 3)}, {np.round(p3, 3)}, {np.round(p4, 3)}, {np.round(p5, 3)}")
             dS = np.round([p2 - p1, p3 - p2, p4 - p3, p5 - p4], 3)
             Rs = [R1, R2, R3, R4, R5]
             R_ = [Rotation.from_quat((R_[0], R_[1], R_[2], R_[3])).as_matrix() for R_ in Rs]
-            self.forward_NE(dS, R_)
+            w, v = self.forward_NE(dS, R_)
+            #print(w, v)
 
             #print(self.dS)
+
+    def calc_q_acc(self, q_k, q_k1, dt):
+        q_a = np.round(np.array((q_k1-q_k)/dt), 3 )
+        print(q_a)
+        return 
 
 if __name__ == '__main__':
     aD = ArmDynamicsNode()
