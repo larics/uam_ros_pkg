@@ -16,12 +16,8 @@ class ArmDynamicsNode:
         self.q_v = []
         # Timer for periodic computation
         self.rate = rospy.Rate(50)  # 100 Hz
-        l1 = 0.1
-        l2 = 0.1
-        l3 = 0.1
-        l4 = 0.1
-        self.l = [l1, l2, l3, l4]
         self.reciv_jnt = False
+        self.reciv_odom = False
         self.first_jnt = True
 
         self.tf_listener = tf.TransformListener()
@@ -59,23 +55,60 @@ class ArmDynamicsNode:
         # self.q_a = np.array(calculate_accelerations())
         self.reciv_jnt = True
 
+
+    def odom_callback(self, msg): 
+        self.uav_w = np.array([msg.twist.twist.angular.x, 
+                               msg.twist.twist.angular.y, 
+                               msg.twist.twist.angular.z])
+        self.uav_v = np.array([msg.twist.twist.linear.x, 
+                               msg.twist.twist.linear.y, 
+                               msg.twist.twist.linear.z])
+        self.reciv_odom = True
+
+    def imu_callback(self, msg): 
+        self.uav_a = np.array([msg.linear_acceleration.x,
+                               msg.linear_acceleration.y,
+                               msg.linear_acceleration.z])
+        self.reciv_imu = True
+                            
     
     def forward_NE(self, dS, R):
         """Forward Newton-Euler calculations."""
         n = len(self.q_p)
         w = np.zeros((n, 3))  # Angular velocity
         v = np.zeros((n, 3))  # Linear velocity
+        alpha = np.zeros((n, 3)) # Angular acceleration
+        a = np.zeros((n, 3)) # Linear acceleration
         # TODO: Add implementation of the linear and angular accs
         for i in range(n):
             if i == 0:
-                w[i] = np.array([0, 0, self.q_v[i]])
-                v[i] = np.array([0, 0, 0])
+                if self.reciv_odom:
+                    w[i] = self.uav_w
+                    v[i] = self.uav_v
+                else:
+                    w[i] = np.zeros(3)
+                    v[i] = np.zeros(3)
+                    # CAN PROBABLY USE IMU DATA
+                    # Check what happens with gravity HERE! 
             else:
+                # Angular
+                # Velocity
                 w[i] = w[i-1] + np.dot(self.q_v[i], R[i-1][:, 2])
+                # Acceleration
+                alpha[i] = alpha[i-1] + np.dot(self.q_a[i], R[i-1][:, 2]) + np.cross(w[i-1], np.dot(self.q_v[i], R[i-1][:, 2]))  
+
+                # Linear
+                # Velocity
                 v[i] = v[i-1] + np.cross(w[i], np.array(dS[i-1])) + np.dot(self.q_v[i], R[i-1][:, 2])
+                # Acceleration
+                wxS = np.cross(w[i], dS[i-1])
+                alphaxS = np.cross(alpha[i], dS[i-1])
+                wxwxS = np.cross(w[i], wxS)
+                a[i] = a[i-1] + alphaxS + wxwxS
+
         #rospy.logdebug(f"Current w: {w}")
         #rospy.logdebug(f"Current v: {v}")
-        return w, v
+        return w, alpha, v, a
     
     def back_NE(): 
         F = []
@@ -91,19 +124,19 @@ class ArmDynamicsNode:
             p4, R4 = self.lookup_transform('link4', 'link3')
             p5, R5 = self.lookup_transform('link5', 'link4')
             # Check if distances are consistent:
-            print(f"Distance: {np.round(p1, 3)}, {np.round(p2, 3)}, {np.round(p3, 3)}, {np.round(p4, 3)}, {np.round(p5, 3)}")
             dS = np.round([p2 - p1, p3 - p2, p4 - p3, p5 - p4], 3)
+            dC = -dS/2
             Rs = [R1, R2, R3, R4, R5]
             R_ = [Rotation.from_quat((R_[0], R_[1], R_[2], R_[3])).as_matrix() for R_ in Rs]
-            w, v = self.forward_NE(dS, R_)
+            if self.reciv_jnt:
+                w, alpha, v, a = self.forward_NE(dS, R_)
             #print(w, v)
 
             #print(self.dS)
 
     def calc_q_acc(self, q_k, q_k1, dt):
         q_a = np.round(np.array((q_k1-q_k)/dt), 3 )
-        print(q_a)
-        return 
+        return q_a
 
 if __name__ == '__main__':
     aD = ArmDynamicsNode()
