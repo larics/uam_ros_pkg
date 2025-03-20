@@ -304,7 +304,8 @@ void ControlArm::cmdToolOrientationCb(const geometry_msgs::Point::ConstPtr &msg)
   // set CMD pose
   m_cmdPose = cmdPose;
 
-  sendToCmdPose();
+  recivPoseCmd = true; 
+  //sendToCmdPose();
 }
 
 bool ControlArm::sendToCmdPose() {
@@ -686,10 +687,10 @@ void ControlArm::run() {
 
     if (robotState == IDLE)
     {
-      ROS_INFO_STREAM("uam_ros_ctl is in IDLE mode.");
+      ROS_INFO_STREAM_THROTTLE(5, "uam_ros_ctl is in IDLE mode.");
     }
     else{
-      ROS_INFO_STREAM("uam_ros_ctl is in "<< stateNames[robotState] << "mode.");
+      ROS_INFO_STREAM_THROTTLE(5, "uam_ros_ctl is in "<< stateNames[robotState] << "mode.");
     }
 
     if (robotState != SERVO_CTL && servoEntered) {servoPtr->setPaused(true); servoEntered=false;} 
@@ -708,6 +709,7 @@ void ControlArm::run() {
         servoPtr->start(); 
         servoEntered = true; 
         ROS_INFO_STREAM("[ControlArm] Turning servo on!");
+        //servoPtr->getStatus(); 
             
       }
       ROS_INFO_STREAM("[ControlArm] servo loop on!");        
