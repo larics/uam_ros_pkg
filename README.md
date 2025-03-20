@@ -62,10 +62,9 @@ roslaunch uam_ros_pkg uam_ros_ctl.launch
 - [x] Enable `control_arm_node` 
 - [x] Publish end effector position on the topic
 - [x] Added topic relay for the moveit (state publishing) 
-- [ ] Test with different planning frame on the UAV 
-- [ ] Test with moveit servo 
-- [ ] Filter out topics that are needed, and ones that are not!
-- [ ] Enable joint commands
-- [ ] Add functionality for simple trajectory execution
-- [ ] Test on real UAM (real manipulator) 
-- [ ] REFACTOR EVERYTHING! 
+- [x] Test with different planning frame on the UAV 
+- [x] Test with moveit servo 
+- [x] Filter out topics that are needed, and ones that are not!
+- [x] Enable joint commands
+- [x] Add functionality for simple trajectory execution
+- [ ] Connect with H2AMI 
