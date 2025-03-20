@@ -8,9 +8,9 @@ command_in_type: "unitless" # "unitless"> in the range [-1:1], as if from joysti
 scale:
   # Scale parameters are only used if command_in_type=="unitless"
   linear:  2.0  # Max linear velocity. Meters per publish_period. Unit is [m/s]. Only used for Cartesian commands.
-  rotational:  0.3 # Max angular velocity. Rads per publish_period. Unit is [rad/s]. Only used for Cartesian commands.
+  rotational:  1.0 # Max angular velocity. Rads per publish_period. Unit is [rad/s]. Only used for Cartesian commands.
   # Max joint angular/linear velocity. Rads or Meters per publish period. Only used for joint commands on joint_command_in_topic.
-  joint: 0.01
+  joint: 0.05
 low_pass_filter_coeff: 2.  # Larger --> trust the filtered data more, trust the measurements less.
 
 ## Properties of outgoing commands
@@ -24,7 +24,7 @@ command_out_type: trajectory_msgs/JointTrajectory
 
 # What to publish? Can save some bandwidth as most robots only require positions or velocities
 publish_joint_positions: true
-publish_joint_velocities: false
+publish_joint_velocities: true
 publish_joint_accelerations: false
 
 ## MoveIt properties
@@ -33,7 +33,7 @@ planning_frame: base  # The MoveIt planning frame. Often 'base_link' or 'world'
 
 ## Other frames
 ee_frame_name: end_effector_base  # The name of the end effector link, used to return the EE pose
-robot_link_command_frame:  base  # commands must be given in the frame of a robot link. Usually either the base or end effector
+robot_link_command_frame: base  # commands must be given in the frame of a robot link. Usually either the base or end effector
 
 ## Stopping behaviour
 incoming_command_timeout:  0.1  # Stop servoing if X seconds elapse without a new command
