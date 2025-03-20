@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.0.2)
 project(uam_ros_ctl)
 
 ## Compile as C++11, YAML-CPP REQ
-add_compile_options(-std=c++11)
+add_compile_options(-std=c++14)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)

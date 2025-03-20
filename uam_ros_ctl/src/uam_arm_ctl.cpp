@@ -17,6 +17,11 @@ ControlArm::ControlArm(ros::NodeHandle nh) : nH(nh) {
   // Initialize robot ctl class
   initRobot();
 
+  // Initialize servo
+  if (enable_servo) {servoPtr = initServo();}; 
+  
+  StatusMonitor status_monitor(nH, "servo_status");
+
   // Find out basic info
   getBasicInfo();
 }
@@ -120,6 +125,28 @@ bool ControlArm::setPlanningScene() {
   ROS_INFO("[ControlArm] Model frame: %s",
            kinematic_model->getModelFrame().c_str());
   return true;
+}
+
+std::unique_ptr<moveit_servo::Servo> ControlArm::initServo(){
+
+  auto planning_scene_monitor = std::make_shared<planning_scene_monitor::PlanningSceneMonitor>("robot_description");
+  if (!planning_scene_monitor->getPlanningScene())
+  {
+    ROS_ERROR_STREAM("Error in setting up the PlanningSceneMonitor.");
+    exit(EXIT_FAILURE);
+  }
+
+  // Start the planning scene monitor
+  planning_scene_monitor->startSceneMonitor();
+  planning_scene_monitor->startWorldGeometryMonitor(
+      planning_scene_monitor::PlanningSceneMonitor::DEFAULT_COLLISION_OBJECT_TOPIC,
+      planning_scene_monitor::PlanningSceneMonitor::DEFAULT_PLANNING_SCENE_WORLD_TOPIC,
+      false /* skip octomap monitor */);
+  planning_scene_monitor->startStateMonitor();
+
+  auto servo = std::make_unique<moveit_servo::Servo>(nH, planning_scene_monitor);
+  
+  return servo; 
 }
 
 
@@ -306,38 +333,6 @@ bool ControlArm::sendToCmdPose() {
   return success;
 }
 
-bool ControlArm::sendToCartesianCmdPose() {
-
-  // get current ee pose
-  geometry_msgs::Pose currPose = getCurrentEEPose(); 
-  // set cmd pose
-  setCmdPose(); 
-
-  moveit::planning_interface::MoveGroupInterface::Plan plannedPath; 
-  std::vector<geometry_msgs::Pose> cartesianWaypoints = createCartesianWaypoints(currPose, m_cmdPose, NUM_CART_PTS); 
-
-  // TODO: create Cartesian plan, use as first point currentPose 4 now, and 
-  // as end point use targetPoint
-  moveit_msgs::RobotTrajectory trajectory;
-  moveit_msgs::MoveItErrorCodes errorCode; 
-  // TODO: Set as params that can be configured in YAML!
-  double jumpThr = 0.0; 
-  double eefStep = 0.02; 
-  // plan Cartesian path
-  m_moveGroupPtr->computeCartesianPath(cartesianWaypoints, eefStep, jumpThr, trajectory, true, &errorCode);
-  //plannedPath.start_state_ = getEEState()
-  //std::cout << "MoveIt! errorCode:" << errorCode;
-  if (errorCode.val != 1){
-    ROS_WARN_ONCE("Planning Cartesian path failed!"); 
-  } 
-  else{
-    std::cout << "Trajectory!" << trajectory; 
-    plannedPath.trajectory_ = trajectory;
-    m_moveGroupPtr->asyncExecute(plannedPath);
-  }
-  return true; 
-}
-
 bool ControlArm::sendToCmdPoses(std::vector<geometry_msgs::Pose> poses) {
   for (int i; i < poses.size(); ++i) {
     ROS_INFO_STREAM("[ControlArmNode] Visiting pose " << i);
@@ -382,15 +377,6 @@ geometry_msgs::Pose ControlArm::getCurrentEEPose() {
 
 }
 
-bool ControlArm::sendToServoCmdPose(){
-
-  ROS_INFO_STREAM("Activating MoveIt Servo!"); 
-
-
-
-  return true; 
-
-}
 
 void ControlArm::addCollisionObject(moveit_msgs::PlanningScene &planningScene) {
 
@@ -698,25 +684,35 @@ void ControlArm::run() {
     geometry_msgs::Pose currentROSPose_; tf::poseEigenToMsg(currentPose_, currentROSPose_);
     currPosePub.publish(currentROSPose_);
 
-    if (recivPoseCmd){
+    if (robotState == IDLE)
+    {
+      ROS_INFO_STREAM("uam_ros_ctl is in IDLE mode.");
+    }
+    else{
+      ROS_INFO_STREAM("uam_ros_ctl is in "<< stateNames[robotState] << "mode.");
+    }
 
-      if(robotState == JOINT_TRAJ_CTL) 
-      {
+    if (robotState != SERVO_CTL && servoEntered) {servoPtr->setPaused(true); servoEntered=false;} 
+
+    if(robotState == JOINT_TRAJ_CTL) 
+    {
+      if (recivPoseCmd)
         sendToCmdPose(); 
-      }
+    }
 
-      if (robotState == CART_TRAJ_CTL)
-      {
-        sendToCartesianCmdPose();
+    if (robotState == SERVO_CTL)
+    {   
+      if (!servoEntered)
+      {   
+        // Moveit servo status codes: https://github.com/moveit/moveit2/blob/main/moveit_ros/moveit_servo/include/moveit_servo/utils/datatypes.hpp  
+        servoPtr->start(); 
+        servoEntered = true; 
+        ROS_INFO_STREAM("[ControlArm] Turning servo on!");
+            
       }
-
-      if(robotState == IDLE)
-      {
-        ROS_WARN("Arm is in the IDLE mode, please activate correct control mode!"); 
+      ROS_INFO_STREAM("[ControlArm] servo loop on!");        
       }
-
       recivPoseCmd = false; 
-
     };
 
     ROS_INFO_STREAM_THROTTLE(60, "Current arm state is: " << stateNames[robotState]); 
@@ -724,8 +720,8 @@ void ControlArm::run() {
     // Sleep
     r.sleep();
 
-  }
-}
+};
+
 
 
 // TOOD: Move to utils

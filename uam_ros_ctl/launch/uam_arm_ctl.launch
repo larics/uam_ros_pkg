@@ -8,6 +8,7 @@
     
     <!-- Start Gazebo + MoveIt! -->
     <!--include file="$(find uam_moveit_config)/launch/demo_gazebo.launch"/-->
+    <arg name="servo_config" default="$(find uam_ros_ctl)/config/servo_params.yaml"/>
 
     <!-- Start MoveIt! -->
     <include file="$(find uam_moveit_config)/launch/demo.launch"/>
@@ -17,6 +18,7 @@
     <node pkg="uam_ros_ctl"  type="uam_arm_ctl_node" name="control_arm" output="screen">
         <param name="config_path" value="$(arg config_path)" />
         <remap from="/joint_states" to="/arm_joint_states" />
+        <rosparam command="load" file="$(arg servo_config)"/>
     </node>
 
 </launch>

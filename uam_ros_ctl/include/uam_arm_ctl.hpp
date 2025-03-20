@@ -33,6 +33,9 @@
 #include <moveit/collision_detection/collision_matrix.h>
 #include <moveit/move_group_interface/move_group_interface.h>
 #include <moveit/planning_scene/planning_scene.h>
+#include <moveit_servo/servo.h>
+#include <moveit_servo/status_codes.h>
+#include <moveit_servo/make_shared_from_pool.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit_msgs/ApplyPlanningScene.h>
@@ -104,6 +107,7 @@ private:
   // Initialization method
   void loadConfig(); 
   void initRobot();
+  std::unique_ptr<moveit_servo::Servo> initServo(); 
 
   // ROS node handle
   ros::NodeHandle nH;
@@ -188,7 +192,6 @@ private:
   bool getIkSrvCb(uam_ros_ctl::getIkRequest &req, uam_ros_ctl::getIkResponse &res); 
   bool setStateCb(uam_ros_ctl::changeStateRequest &req, uam_ros_ctl::changeStateResponse &res);
 
-
   // methods
   bool sendToCmdPose();
   bool sendToCartesianCmdPose(); 
@@ -243,6 +246,8 @@ private:
   bool planSceneInit = false;
   bool planSceneMonitorInit = false; 
   bool blockingMovement = true;
+  bool enable_servo = true; 
+  bool servoEntered  = false; 
   std::string endEffectorLinkName;
   geometry_msgs::Pose m_cmdPose;
   geometry_msgs::Pose m_lastCmdPose;
@@ -250,6 +255,8 @@ private:
 
   // Vectors and arrays
   std::vector<double> m_jointPositions_;
+  std::unique_ptr<moveit_servo::Servo> servoPtr; 
+
 };
 
 class StatusMonitor
