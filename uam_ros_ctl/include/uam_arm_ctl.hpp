@@ -56,13 +56,13 @@
 // Utils
 #include <tf2/LinearMath/Quaternion.h>
 
-// Custom service
-#include "uam_ros_ctl/getIk.h"
-#include "uam_ros_ctl/getIkRequest.h"
-#include "uam_ros_ctl/getIkResponse.h"
-#include "uam_ros_ctl/changeState.h"
-#include "uam_ros_ctl/changeStateRequest.h"
-#include "uam_ros_ctl/changeStateResponse.h"
+// Custom service -> move to custom msg package
+#include "uam_ros_msgs/getIk.h"
+#include "uam_ros_msgs/getIkRequest.h"
+#include "uam_ros_msgs/getIkResponse.h"
+#include "uam_ros_msgs/changeState.h"
+#include "uam_ros_msgs/changeStateRequest.h"
+#include "uam_ros_msgs/changeStateResponse.h"
 
 #define stringify( name ) #name
 
@@ -189,8 +189,8 @@ private:
   bool startJointTrajCtlCb(std_srvs::TriggerRequest &req, std_srvs::TriggerResponse &res);
   bool startJointGroupPositionCtlCb(std_srvs::TriggerRequest &req, std_srvs::TriggerResponse &res);
   bool startJointGroupVelocityCtlCb(std_srvs::TriggerRequest &req, std_srvs::TriggerResponse &res);
-  bool getIkSrvCb(uam_ros_ctl::getIkRequest &req, uam_ros_ctl::getIkResponse &res); 
-  bool setStateCb(uam_ros_ctl::changeStateRequest &req, uam_ros_ctl::changeStateResponse &res);
+  bool getIkSrvCb(uam_ros_msgs::getIkRequest &req, uam_ros_msgs::getIkResponse &res); 
+  bool setStateCb(uam_ros_msgs::changeStateRequest &req, uam_ros_msgs::changeStateResponse &res);
 
   // methods
   bool sendToCmdPose();

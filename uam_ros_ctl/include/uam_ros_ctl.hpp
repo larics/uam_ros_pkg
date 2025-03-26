@@ -17,8 +17,6 @@
 #include <tf/tf.h>
 #include <tf_conversions/tf_eigen.h>
 
-
-
 class UamRosCtl
 {
     public: 

@@ -20,25 +20,27 @@ find_package(catkin REQUIRED COMPONENTS
     std_msgs
     tf
     eigen_conversions
+    uam_ros_msgs
 )
 
 find_package(Eigen3 REQUIRED)
 find_package(yaml-cpp REQUIRED)
 
 ## Must be called before catkin_package
-add_service_files(
-        DIRECTORY srv
-        FILES
-        getIk.srv
-        changeState.srv
-)
+# Services are moved to uam_ros_msgs pkg
+#add_service_files(
+#        DIRECTORY srv
+#        FILES
+#        getIk.srv
+#        changeState.srv
+#)
 
 generate_messages(
     DEPENDENCIES std_msgs geometry_msgs sensor_msgs
 )
 
 catkin_package(
-    INCLUDE_DIRS include srv
+    INCLUDE_DIRS include #srv
     LIBRARIES ${PROJECT_NAME}_lib
     CATKIN_DEPENDS
         geometry_msgs
@@ -55,6 +57,7 @@ catkin_package(
         std_msgs
         tf
         eigen_conversions
+        uam_ros_msgs
     DEPENDS 
         Eigen3 
         yaml-cpp

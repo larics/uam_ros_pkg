@@ -149,7 +149,6 @@ std::unique_ptr<moveit_servo::Servo> ControlArm::initServo(){
   return servo; 
 }
 
-
 void ControlArm::getBasicInfo() {
 
   if (moveGroupInit) {
@@ -171,7 +170,7 @@ bool ControlArm::setCmdPose() {
   return false;
 }
 
-bool ControlArm::setStateCb(uam_ros_ctl::changeStateRequest &req, uam_ros_ctl::changeStateResponse &res)
+bool ControlArm::setStateCb(uam_ros_msgs::changeStateRequest &req, uam_ros_msgs::changeStateResponse &res)
 {
 
     // Why would this be boolean? 
@@ -240,7 +239,7 @@ bool ControlArm::getIK(const geometry_msgs::Pose wantedPose, const std::size_t a
   return found_ik;
 }
 
-bool ControlArm::getIkSrvCb(uam_ros_ctl::getIkRequest &req, uam_ros_ctl::getIkResponse &res)
+bool ControlArm::getIkSrvCb(uam_ros_msgs::getIkRequest &req, uam_ros_msgs::getIkResponse &res)
 {
     int attempts = 10;
     int timeout = 1;
@@ -377,7 +376,6 @@ geometry_msgs::Pose ControlArm::getCurrentEEPose() {
   return currROSPose;
 
 }
-
 
 void ControlArm::addCollisionObject(moveit_msgs::PlanningScene &planningScene) {
 

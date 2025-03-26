@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>uam_ros_msgs</name>
+  <version>0.0.1</version>
+  <description>Custom ROS messages and for UAM msgs package</description>
+
+  <maintainer email="filip.zoric@fer.hr">Filip Zoric</maintainer>
+  <license>Bosko</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <depend>std_msgs</depend>  
+  <depend>message_generation</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <exec_depend>message_runtime</exec_depend>
+
+
+  <export>
+  </export>
+</package>
